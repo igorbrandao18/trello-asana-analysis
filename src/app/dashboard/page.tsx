@@ -3,20 +3,24 @@
 import { PageWrapper } from '@/components/PageWrapper';
 import styled from 'styled-components';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { IconArrowUpRight, IconArrowDownRight, IconClock, IconChecks } from '@tabler/icons-react';
+import { IconArrowUpRight, IconArrowDownRight, IconClock, IconChecks, IconAlertTriangle, IconLoader2 } from '@tabler/icons-react';
+import { useDashboard } from '@/hooks/useDashboard';
 
 const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-6);
-  margin-bottom: var(--space-6);
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  width: 100%;
 `;
 
 const Card = styled.div`
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
-  padding: var(--space-6);
+  padding: var(--space-4);
   border: 1px solid var(--border-subtle);
+  position: relative;
+  height: 100%;
 `;
 
 const StatCard = styled(Card)`
@@ -51,7 +55,7 @@ const StatChange = styled.div<{ positive?: boolean }>`
 
 const ChartCard = styled(Card)`
   grid-column: span 2;
-  height: 300px;
+  min-height: 350px;
 `;
 
 const TaskList = styled.div`
@@ -104,115 +108,194 @@ const TaskItem = styled.div`
   }
 `;
 
-const chartData = [
-  { name: 'Jan', trello: 400, asana: 240 },
-  { name: 'Fev', trello: 300, asana: 139 },
-  { name: 'Mar', trello: 200, asana: 980 },
-  { name: 'Abr', trello: 278, asana: 390 },
-  { name: 'Mai', trello: 189, asana: 480 },
-  { name: 'Jun', trello: 239, asana: 380 },
-  { name: 'Jul', trello: 349, asana: 430 },
-];
+const LoadingOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  border-radius: var(--radius-lg);
 
-const tasks = [
-  {
-    id: 1,
-    title: 'Migração de Dados',
-    description: 'Transferência de cartões do Trello para o Asana',
-    status: 'Em Progresso',
-    icon: <IconClock />,
-  },
-  {
-    id: 2,
-    title: 'Sincronização Completa',
-    description: 'Todos os dados foram sincronizados com sucesso',
-    status: 'Concluído',
-    icon: <IconChecks />,
-  },
-];
+  svg {
+    width: 24px;
+    height: 24px;
+    color: var(--text-primary);
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
+const ErrorMessage = styled.div`
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-md);
+  color: var(--status-error);
+  margin-bottom: var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+`;
 
 export default function DashboardPage() {
+  const { data, error, isLoading } = useDashboard();
+
+  if (error) {
+    return (
+      <PageWrapper title="Dashboard">
+        <ErrorMessage>
+          <IconAlertTriangle />
+          Erro ao carregar os dados do dashboard. Por favor, tente novamente mais tarde.
+        </ErrorMessage>
+      </PageWrapper>
+    );
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'Em Progresso':
+        return <IconClock />;
+      case 'Concluído':
+        return <IconChecks />;
+      default:
+        return <IconAlertTriangle />;
+    }
+  };
+
   return (
     <PageWrapper title="Dashboard">
       <Grid>
         <StatCard>
           <StatTitle>Total de Cards</StatTitle>
-          <StatValue>2,543</StatValue>
-          <StatChange positive>
-            <IconArrowUpRight />
-            12.5%
-          </StatChange>
+          <StatValue>{data?.stats.totalCards.toLocaleString() ?? '---'}</StatValue>
+          {data?.stats.changes && (
+            <StatChange positive={data.stats.changes.totalCards > 0}>
+              {data.stats.changes.totalCards > 0 ? <IconArrowUpRight /> : <IconArrowDownRight />}
+              {Math.abs(data.stats.changes.totalCards)}%
+            </StatChange>
+          )}
+          {isLoading && (
+            <LoadingOverlay>
+              <IconLoader2 />
+            </LoadingOverlay>
+          )}
         </StatCard>
 
         <StatCard>
           <StatTitle>Cards Migrados</StatTitle>
-          <StatValue>1,875</StatValue>
-          <StatChange positive>
-            <IconArrowUpRight />
-            8.2%
-          </StatChange>
+          <StatValue>{data?.stats.migratedCards.toLocaleString() ?? '---'}</StatValue>
+          {data?.stats.changes && (
+            <StatChange positive={data.stats.changes.migratedCards > 0}>
+              {data.stats.changes.migratedCards > 0 ? <IconArrowUpRight /> : <IconArrowDownRight />}
+              {Math.abs(data.stats.changes.migratedCards)}%
+            </StatChange>
+          )}
+          {isLoading && (
+            <LoadingOverlay>
+              <IconLoader2 />
+            </LoadingOverlay>
+          )}
         </StatCard>
 
         <StatCard>
           <StatTitle>Taxa de Sucesso</StatTitle>
-          <StatValue>94.3%</StatValue>
-          <StatChange positive>
-            <IconArrowUpRight />
-            2.1%
-          </StatChange>
+          <StatValue>{data?.stats.successRate.toFixed(1)}% ?? '---'</StatValue>
+          {data?.stats.changes && (
+            <StatChange positive={data.stats.changes.successRate > 0}>
+              {data.stats.changes.successRate > 0 ? <IconArrowUpRight /> : <IconArrowDownRight />}
+              {Math.abs(data.stats.changes.successRate)}%
+            </StatChange>
+          )}
+          {isLoading && (
+            <LoadingOverlay>
+              <IconLoader2 />
+            </LoadingOverlay>
+          )}
         </StatCard>
 
         <StatCard>
           <StatTitle>Erros</StatTitle>
-          <StatValue>23</StatValue>
-          <StatChange>
-            <IconArrowDownRight />
-            5.4%
-          </StatChange>
+          <StatValue>{data?.stats.errors ?? '---'}</StatValue>
+          {data?.stats.changes && (
+            <StatChange positive={data.stats.changes.errors < 0}>
+              {data.stats.changes.errors < 0 ? <IconArrowUpRight /> : <IconArrowDownRight />}
+              {Math.abs(data.stats.changes.errors)}%
+            </StatChange>
+          )}
+          {isLoading && (
+            <LoadingOverlay>
+              <IconLoader2 />
+            </LoadingOverlay>
+          )}
         </StatCard>
 
         <ChartCard>
           <h2 style={{ marginBottom: 'var(--space-4)', fontSize: '1.125rem', fontWeight: 500 }}>
             Atividade de Migração
           </h2>
-          <ResponsiveContainer width="100%" height="90%">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="trelloFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--brand-primary)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="var(--brand-primary)" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="asanaFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--brand-secondary)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="var(--brand-secondary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-              <XAxis dataKey="name" stroke="var(--text-secondary)" />
-              <YAxis stroke="var(--text-secondary)" />
-              <Tooltip 
-                contentStyle={{ 
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-md)'
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="trello"
-                stroke="var(--brand-primary)"
-                fillOpacity={1}
-                fill="url(#trelloFill)"
-              />
-              <Area
-                type="monotone"
-                dataKey="asana"
-                stroke="var(--brand-secondary)"
-                fillOpacity={1}
-                fill="url(#asanaFill)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {data?.activity && (
+            <ResponsiveContainer width="100%" height="90%">
+              <AreaChart data={data.activity}>
+                <defs>
+                  <linearGradient id="trelloFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--brand-primary)" stopOpacity={0.5} />
+                    <stop offset="100%" stopColor="var(--brand-primary)" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="asanaFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--brand-secondary)" stopOpacity={0.5} />
+                    <stop offset="100%" stopColor="var(--brand-secondary)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+                <XAxis dataKey="name" stroke="var(--text-secondary)" />
+                <YAxis stroke="var(--text-secondary)" />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-md)'
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="trello"
+                  stroke="var(--brand-primary)"
+                  fillOpacity={1}
+                  fill="url(#trelloFill)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="asana"
+                  stroke="var(--brand-secondary)"
+                  fillOpacity={1}
+                  fill="url(#asanaFill)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+          {isLoading && (
+            <LoadingOverlay>
+              <IconLoader2 />
+            </LoadingOverlay>
+          )}
         </ChartCard>
 
         <ChartCard>
@@ -220,10 +303,10 @@ export default function DashboardPage() {
             Status da Migração
           </h2>
           <TaskList>
-            {tasks.map(task => (
+            {data?.tasks.map(task => (
               <TaskItem key={task.id}>
                 <div className="task-icon">
-                  {task.icon}
+                  {getStatusIcon(task.status)}
                 </div>
                 <div className="task-info">
                   <h3>{task.title}</h3>
@@ -235,6 +318,11 @@ export default function DashboardPage() {
               </TaskItem>
             ))}
           </TaskList>
+          {isLoading && (
+            <LoadingOverlay>
+              <IconLoader2 />
+            </LoadingOverlay>
+          )}
         </ChartCard>
       </Grid>
     </PageWrapper>

@@ -12,6 +12,7 @@ const Wrapper = styled.div`
   margin-left: var(--sidebar-width);
   min-height: 100vh;
   background: var(--bg-base);
+  width: calc(100vw - var(--sidebar-width));
 `;
 
 const Header = styled.header`
@@ -72,9 +73,10 @@ const UserProfile = styled.div`
 `;
 
 const Main = styled.main`
+  width: 100%;
+  height: calc(100vh - var(--header-height));
+  overflow-y: auto;
   padding: var(--space-6);
-  max-width: var(--content-max-width);
-  margin: 0 auto;
 `;
 
 export function PageWrapper({ title, children }: PageWrapperProps) {
