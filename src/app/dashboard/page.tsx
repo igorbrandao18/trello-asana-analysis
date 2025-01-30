@@ -3,8 +3,10 @@
 import { PageWrapper } from '@/components/PageWrapper';
 import styled from 'styled-components';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { IconArrowUpRight, IconArrowDownRight, IconClock, IconChecks, IconAlertTriangle, IconLoader2 } from '@tabler/icons-react';
+import { IconArrowUpRight, IconArrowDownRight, IconClock, IconChecks, IconAlertTriangle, IconLoader2, IconArrowRight } from '@tabler/icons-react';
 import { useDashboard } from '@/hooks/useDashboard';
+import { migrateFromTrelloToAsana } from '@/services/api';
+import { useState } from 'react';
 
 const Grid = styled.div`
   display: grid;
@@ -155,8 +157,55 @@ const ErrorMessage = styled.div`
   }
 `;
 
+const MigrationButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--brand-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  margin-bottom: var(--space-4);
+
+  &:hover {
+    background: var(--brand-primary-hover);
+  }
+
+  &:disabled {
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+`;
+
 export default function DashboardPage() {
-  const { data, error, isLoading } = useDashboard();
+  const { data, error, isLoading, refresh } = useDashboard();
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationError, setMigrationError] = useState<string | null>(null);
+
+  const handleMigration = async () => {
+    try {
+      setIsMigrating(true);
+      setMigrationError(null);
+      
+      await migrateFromTrelloToAsana();
+      
+      // Atualiza os dados do dashboard após a migração
+      await refresh();
+    } catch (err) {
+      setMigrationError('Erro ao realizar a migração. Por favor, tente novamente.');
+      console.error('Erro na migração:', err);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   if (error) {
     return (
@@ -182,6 +231,30 @@ export default function DashboardPage() {
 
   return (
     <PageWrapper title="Dashboard">
+      {migrationError && (
+        <ErrorMessage>
+          <IconAlertTriangle />
+          {migrationError}
+        </ErrorMessage>
+      )}
+
+      <MigrationButton 
+        onClick={handleMigration} 
+        disabled={isMigrating || isLoading}
+      >
+        {isMigrating ? (
+          <>
+            <IconLoader2 />
+            Migrando dados...
+          </>
+        ) : (
+          <>
+            <IconArrowRight />
+            Iniciar Migração
+          </>
+        )}
+      </MigrationButton>
+
       <Grid>
         <StatCard>
           <StatTitle>Total de Cards</StatTitle>

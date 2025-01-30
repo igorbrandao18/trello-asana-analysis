@@ -3,7 +3,7 @@ import { DashboardData } from '@/types/dashboard';
 import { env } from '@/config/env';
 
 // APIs do Trello e Asana
-const trelloApi = axios.create({
+export const trelloApi = axios.create({
   baseURL: env.trello.apiUrl,
   params: {
     key: env.trello.key,
@@ -11,12 +11,71 @@ const trelloApi = axios.create({
   },
 });
 
-const asanaApi = axios.create({
+export const asanaApi = axios.create({
   baseURL: env.asana.apiUrl,
   headers: {
     Authorization: `Bearer ${env.asana.token}`,
   },
 });
+
+// Função para migrar cards do Trello para o Asana
+export async function migrateFromTrelloToAsana() {
+  try {
+    // 1. Busca dados do Trello
+    const [trelloBoards, trelloCards] = await Promise.all([
+      trelloApi.get('/members/me/boards', {
+        params: {
+          fields: 'id,name,lists',
+        },
+      }),
+      trelloApi.get('/members/me/cards', {
+        params: {
+          fields: 'id,name,desc,idList',
+        },
+      }),
+    ]);
+
+    // 2. Busca workspace do Asana
+    const asanaUser = await asanaApi.get('/users/me');
+    const workspaceId = asanaUser.data.data.workspaces[0].gid;
+
+    // 3. Cria um novo projeto no Asana para cada board do Trello
+    for (const board of trelloBoards.data) {
+      // Cria o projeto
+      const projectResponse = await asanaApi.post('/projects', {
+        data: {
+          name: `${board.name} (Migrado do Trello)`,
+          workspace: workspaceId,
+        },
+      });
+
+      const projectId = projectResponse.data.data.gid;
+
+      // Filtra os cards deste board
+      const boardCards = trelloCards.data.filter(card => card.idBoard === board.id);
+
+      // Cria as tasks no Asana
+      for (const card of boardCards) {
+        await asanaApi.post('/tasks', {
+          data: {
+            name: card.name,
+            notes: card.desc,
+            projects: [projectId],
+            workspace: workspaceId,
+          },
+        });
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Migração concluída com sucesso!',
+    };
+  } catch (error) {
+    console.error('Erro durante a migração:', error);
+    throw error;
+  }
+}
 
 // Função auxiliar para calcular as mudanças percentuais
 function calculateChange(current: number, previous: number): number {
@@ -53,27 +112,30 @@ export async function getDashboardData(): Promise<DashboardData> {
       ? await asanaApi.get(`/projects/${projectId}/tasks`)
       : { data: { data: [] } };
 
+    // Flag para indicar se a migração foi iniciada
+    const migrationStarted = false; // TODO: Implementar lógica de controle de migração
+
     // Calcula estatísticas baseadas nos dados reais
     const totalCards = trelloCards.data?.length || 0;
-    const migratedCards = asanaTasks.data.data?.length || 0;
+    const migratedCards = migrationStarted ? (asanaTasks.data.data?.length || 0) : 0;
     
-    // Taxa de sucesso é calculada apenas se houver cards para migrar
-    const successRate = totalCards > 0 
+    // Taxa de sucesso é calculada apenas se a migração foi iniciada e há cards para migrar
+    const successRate = (migrationStarted && totalCards > 0)
       ? Math.round((migratedCards / totalCards) * 100)
       : 0;
     
-    // Erros são a diferença entre cards não migrados
-    const errors = totalCards > migratedCards ? totalCards - migratedCards : 0;
+    // Erros são contados apenas se a migração foi iniciada
+    const errors = migrationStarted ? (totalCards > migratedCards ? totalCards - migratedCards : 0) : 0;
 
     // Histórico para cálculo de mudanças (últimas 24h)
     const previousStats = {
       totalCards: totalCards,
-      migratedCards: migratedCards > 0 ? migratedCards - 1 : 0, // Simula migração recente
-      successRate: successRate > 0 ? successRate - 10 : 0, // Simula progresso
-      errors: errors
+      migratedCards: 0, // Zeramos pois a migração não começou
+      successRate: 0,   // Zeramos pois a migração não começou
+      errors: 0         // Zeramos pois a migração não começou
     };
 
-    // Gera dados de atividade dos últimos 7 dias com dados reais
+    // Gera dados de atividade dos últimos 7 dias
     const activity = Array.from({ length: 7 }).map((_, index) => {
       const date = new Date();
       date.setDate(date.getDate() - (6 - index));
@@ -81,7 +143,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       return {
         name: date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
         trello: totalCards,
-        asana: index === 6 ? migratedCards : Math.floor(migratedCards * 0.8) // Mostra progresso no último dia
+        asana: migrationStarted ? (index === 6 ? migratedCards : 0) : 0 // Só mostra dados se migração iniciada
       };
     });
 
@@ -106,8 +168,10 @@ export async function getDashboardData(): Promise<DashboardData> {
       {
         id: 3,
         title: 'Status da Migração',
-        description: `${migratedCards} de ${totalCards} cards migrados`,
-        status: migratedCards === totalCards ? 'Concluído' as const : 'Em Progresso' as const,
+        description: migrationStarted 
+          ? `${migratedCards} de ${totalCards} cards migrados`
+          : 'Migração não iniciada',
+        status: 'Em Progresso' as const,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }

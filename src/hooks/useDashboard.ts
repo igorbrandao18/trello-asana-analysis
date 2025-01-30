@@ -7,7 +7,7 @@ export function useDashboard() {
     data, 
     error, 
     isLoading, 
-    mutate 
+    mutate: refresh 
   } = useSWR<DashboardData>('dashboard', getDashboardData, {
     refreshInterval: 30000, // Atualiza a cada 30 segundos
   });
@@ -16,6 +16,6 @@ export function useDashboard() {
     data,
     error,
     isLoading,
-    refresh: mutate,
+    refresh,
   };
 } 

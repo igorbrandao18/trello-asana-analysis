@@ -7,6 +7,8 @@ import { theme } from '@/styles/theme';
 import StyledComponentsRegistry from '@/lib/registry';
 import { GlobalStyles } from '@/styles/global';
 import { IconHome, IconBriefcase, IconList, IconSettings, IconBrandTrello, IconBrandAsana, IconBell, IconUser } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
+import { trelloApi, asanaApi } from '@/services/api';
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -65,9 +67,11 @@ const ConnectionItem = styled.div`
   background: var(--bg-surface);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-3);
+  cursor: pointer;
+  transition: all var(--transition-fast);
 
-  &:last-child {
-    margin-bottom: 0;
+  &:hover {
+    background: var(--bg-surface-hover);
   }
 
   svg {
@@ -155,6 +159,50 @@ const UserProfile = styled.div`
 `;
 
 export function ClientLayout({ children }: ClientLayoutProps) {
+  const router = useRouter();
+
+  const handleTrelloClick = async () => {
+    try {
+      // Busca boards e cards do Trello
+      const [boards, cards] = await Promise.all([
+        trelloApi.get('/members/me/boards', {
+          params: {
+            fields: 'id,name,lists',
+          },
+        }),
+        trelloApi.get('/members/me/cards', {
+          params: {
+            fields: 'id,name,desc,idList',
+          },
+        }),
+      ]);
+
+      console.log('Dados do Trello:', { boards: boards.data, cards: cards.data });
+      router.push('/trello');
+    } catch (error) {
+      console.error('Erro ao buscar dados do Trello:', error);
+    }
+  };
+
+  const handleAsanaClick = async () => {
+    try {
+      // Busca workspace e projetos do Asana
+      const user = await asanaApi.get('/users/me');
+      const workspaceId = user.data.data.workspaces[0].gid;
+      
+      const projects = await asanaApi.get(`/workspaces/${workspaceId}/projects`);
+      
+      console.log('Dados do Asana:', { 
+        workspace: user.data.data.workspaces[0],
+        projects: projects.data.data 
+      });
+      
+      router.push('/asana');
+    } catch (error) {
+      console.error('Erro ao buscar dados do Asana:', error);
+    }
+  };
+
   return (
     <StyledComponentsRegistry>
       <ThemeProvider theme={theme}>
@@ -166,7 +214,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             </Logo>
             
             <ConnectionPanel>
-              <ConnectionItem>
+              <ConnectionItem onClick={handleTrelloClick}>
                 <IconBrandTrello />
                 <div className="connection-info">
                   <div>Trello</div>
@@ -174,7 +222,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 </div>
                 <div className="status" />
               </ConnectionItem>
-              <ConnectionItem>
+              <ConnectionItem onClick={handleAsanaClick}>
                 <IconBrandAsana />
                 <div className="connection-info">
                   <div>Asana</div>
