@@ -21,7 +21,7 @@ export interface MigrationTask {
   id: number;
   title: string;
   description: string;
-  status: 'Em Progresso' | 'Concluído' | 'Erro';
+  status: 'Concluído' | 'Em Progresso' | 'Erro';
   createdAt: string;
   updatedAt: string;
 }
