@@ -1,95 +1,145 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+
+import { useState, ChangeEvent } from 'react';
+import { useIntegration } from '@/hooks/useIntegration';
+import { useConnectionTest } from '@/hooks/useConnectionTest';
+import { Header } from '@/components/Header';
+import { Container, Card, CardTitle, FormGrid, FormGroup, Label, Select, Button, MainGrid } from '@/styles/components';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { IntegrationStatus } from '@/components/IntegrationStatus';
+import { TrelloIcon, LayoutGrid } from 'lucide-react';
+import { TrelloBoard } from '@/types/trello';
+import { AsanaWorkspace } from '@/types/asana';
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [error, setError] = useState<string>();
+  const [success, setSuccess] = useState(false);
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+  const { 
+    trelloStatus, 
+    asanaStatus, 
+    trelloData, 
+    asanaData, 
+    isLoading: isTestingConnection,
+    retryTrello,
+    retryAsana,
+  } = useConnectionTest();
+
+  const {
+    selectedBoard,
+    setSelectedBoard,
+    selectedWorkspace,
+    setSelectedWorkspace,
+    trelloBoards,
+    asanaWorkspaces,
+    isLoadingTrello,
+    isLoadingAsana,
+    isSyncing,
+    sync,
+  } = useIntegration({
+    onSuccess: () => {
+      setSuccess(true);
+      setError(undefined);
+    },
+    onError: (error) => {
+      setError(error.message);
+      setSuccess(false);
+    },
+  });
+
+  if (isTestingConnection) {
+    return <LoadingSpinner />;
+  }
+
+  const handleBoardChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedBoard(e.target.value);
+  };
+
+  const handleWorkspaceChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedWorkspace(e.target.value);
+  };
+
+  return (
+    <>
+      <Header
+        trelloStatus={trelloStatus}
+        asanaStatus={asanaStatus}
+        trelloUser={trelloData?.success ? trelloData.userData : undefined}
+        asanaUser={asanaData?.success ? asanaData.userData : undefined}
+        onRetryTrello={() => retryTrello()}
+        onRetryAsana={() => retryAsana()}
+      />
+      <Container>
+        <MainGrid>
+          <Card>
+            <CardTitle>
+              <TrelloIcon />
+              Configuração da Integração
+            </CardTitle>
+            <FormGrid>
+              <FormGroup>
+                <Label>
+                  <TrelloIcon />
+                  Quadro do Trello
+                </Label>
+                <Select
+                  value={selectedBoard}
+                  onChange={handleBoardChange}
+                  disabled={trelloStatus !== 'connected'}
+                >
+                  <option value="">Selecione um quadro</option>
+                  {(trelloBoards as TrelloBoard[] | undefined)?.map((board) => (
+                    <option key={board.id} value={board.id}>
+                      {board.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>
+                  <LayoutGrid />
+                  Workspace do Asana
+                </Label>
+                <Select
+                  value={selectedWorkspace}
+                  onChange={handleWorkspaceChange}
+                  disabled={asanaStatus !== 'connected'}
+                >
+                  <option value="">Selecione um workspace</option>
+                  {(asanaWorkspaces as AsanaWorkspace[] | undefined)?.map((workspace) => (
+                    <option key={workspace.gid} value={workspace.gid}>
+                      {workspace.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormGroup>
+            </FormGrid>
+
+            <Button
+              onClick={() => sync()}
+              disabled={
+                !selectedBoard || 
+                !selectedWorkspace || 
+                isSyncing || 
+                trelloStatus !== 'connected' || 
+                asanaStatus !== 'connected'
+              }
+              $loading={isSyncing}
+            >
+              {isSyncing ? 'Sincronizando...' : 'Iniciar Integração'}
+            </Button>
+
+            {(error || success) && (
+              <IntegrationStatus
+                isLoading={isSyncing}
+                error={error}
+                success={success}
+              />
+            )}
+          </Card>
+        </MainGrid>
+      </Container>
+    </>
   );
-}
+} 
