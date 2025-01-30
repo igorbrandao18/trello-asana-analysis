@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import styled, { keyframes } from 'styled-components';
 
@@ -47,6 +48,16 @@ const Text = styled.p`
 `;
 
 export function LoadingSpinner() {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
+
   return (
     <Container>
       <SpinnerWrapper>

@@ -14,12 +14,24 @@ export function useIntegration({ onSuccess, onError }: UseIntegrationProps = {})
 
   const { data: trelloBoards, isLoading: isLoadingTrello } = useQuery({
     queryKey: ['trello-boards'],
-    queryFn: trelloService.getBoards,
+    queryFn: async () => {
+      console.log('Fetching Trello boards...');
+      const boards = await trelloService.getBoards();
+      console.log('Trello boards:', boards);
+      return boards;
+    },
+    enabled: true, // Sempre buscar os quadros
   });
 
   const { data: asanaWorkspaces, isLoading: isLoadingAsana } = useQuery({
     queryKey: ['asana-workspaces'],
-    queryFn: asanaService.getWorkspaces,
+    queryFn: async () => {
+      console.log('Fetching Asana workspaces...');
+      const workspaces = await asanaService.getWorkspaces();
+      console.log('Asana workspaces:', workspaces);
+      return workspaces;
+    },
+    enabled: true, // Sempre buscar os workspaces
   });
 
   const { mutate: sync, isPending: isSyncing } = useMutation({

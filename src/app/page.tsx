@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, ChangeEvent } from 'react';
+import { useState, ChangeEvent, useEffect } from 'react';
 import { useIntegration } from '@/hooks/useIntegration';
 import { useConnectionTest } from '@/hooks/useConnectionTest';
 import { Header } from '@/components/Header';
@@ -14,6 +14,11 @@ import { AsanaWorkspace } from '@/types/asana';
 export default function Home() {
   const [error, setError] = useState<string>();
   const [success, setSuccess] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const { 
     trelloStatus, 
@@ -47,8 +52,8 @@ export default function Home() {
     },
   });
 
-  if (isTestingConnection) {
-    return <LoadingSpinner />;
+  if (!isMounted || isTestingConnection) {
+    return null;
   }
 
   const handleBoardChange = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -58,6 +63,8 @@ export default function Home() {
   const handleWorkspaceChange = (e: ChangeEvent<HTMLSelectElement>) => {
     setSelectedWorkspace(e.target.value);
   };
+
+  const showStatus = isSyncing || error || success;
 
   return (
     <>
@@ -85,7 +92,7 @@ export default function Home() {
                 <Select
                   value={selectedBoard}
                   onChange={handleBoardChange}
-                  disabled={trelloStatus !== 'connected'}
+                  disabled={trelloStatus !== 'connected' || isLoadingTrello}
                 >
                   <option value="">Selecione um quadro</option>
                   {(trelloBoards as TrelloBoard[] | undefined)?.map((board) => (
@@ -104,7 +111,7 @@ export default function Home() {
                 <Select
                   value={selectedWorkspace}
                   onChange={handleWorkspaceChange}
-                  disabled={asanaStatus !== 'connected'}
+                  disabled={asanaStatus !== 'connected' || isLoadingAsana}
                 >
                   <option value="">Selecione um workspace</option>
                   {(asanaWorkspaces as AsanaWorkspace[] | undefined)?.map((workspace) => (
@@ -130,7 +137,7 @@ export default function Home() {
               {isSyncing ? 'Sincronizando...' : 'Iniciar Integração'}
             </Button>
 
-            {(error || success) && (
+            {showStatus && (
               <IntegrationStatus
                 isLoading={isSyncing}
                 error={error}
