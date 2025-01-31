@@ -180,6 +180,23 @@ export async function migrateProjects(
 
         const projectId = asanaProject.data.data.gid;
 
+        // Remover a tarefa "Sem título" que é criada automaticamente
+        try {
+          const tasks = await asanaApi.get(`/projects/${projectId}/tasks`, {
+            params: {
+              opt_fields: 'gid,name'
+            }
+          });
+          
+          const untitledTask = tasks.data.data.find((task: any) => task.name === 'Untitled' || task.name === 'Sem título');
+          if (untitledTask) {
+            await asanaApi.delete(`/tasks/${untitledTask.gid}`);
+          }
+        } catch (error) {
+          console.error('Erro ao tentar remover tarefa sem título:', error);
+          // Continua mesmo se não conseguir remover a tarefa sem título
+        }
+
         // 3. Criar seções no Asana (equivalentes às listas do Trello)
         const sectionMap = new Map();
         for (const list of board.data.lists) {
@@ -267,6 +284,8 @@ export async function migrateProjects(
 export async function migrateSingleCard(
   cardId: string,
   boardId: string,
+  asanaProjectId: string,
+  asanaSectionId: string,
   onProgress?: (progress: { current: number; total: number }) => void
 ) {
   try {
@@ -277,54 +296,28 @@ export async function migrateSingleCard(
       }
     });
 
-    // 2. Buscar detalhes do board para saber a lista
-    const board = await trelloApi.get(`/boards/${boardId}`, {
-      params: {
-        lists: 'open',
-        fields: 'id,name,desc'
-      }
-    });
+    onProgress?.({ current: 1, total: 3 });
 
-    // 3. Criar ou obter projeto no Asana
-    const user = await asanaApi.get('/users/me');
-    const workspaceId = user.data.data.workspaces[0].gid;
-
-    const asanaProject = await asanaApi.post('/projects', {
-      data: {
-        name: `${board.data.name} (Migrado do Trello)`,
-        notes: board.data.desc,
-        workspace: workspaceId,
-      },
-    });
-
-    const projectId = asanaProject.data.data.gid;
-
-    // 4. Criar seção no Asana correspondente à lista do Trello
-    const list = await trelloApi.get(`/lists/${card.data.idList}`);
-    const section = await asanaApi.post(`/projects/${projectId}/sections`, {
-      data: {
-        name: list.data.name,
-      },
-    });
-
-    // 5. Criar a tarefa no Asana
+    // 2. Criar a tarefa no Asana diretamente na seção selecionada
     await asanaApi.post('/tasks', {
       data: {
         name: card.data.name,
-        notes: card.data.desc,
+        notes: card.data.desc || '',
         due_on: card.data.due,
-        projects: [projectId],
+        projects: [asanaProjectId],
         memberships: [{
-          project: projectId,
-          section: section.data.data.gid
+          project: asanaProjectId,
+          section: asanaSectionId
         }]
       },
     });
 
-    // 6. Deletar o card original do Trello
+    onProgress?.({ current: 2, total: 3 });
+
+    // 3. Deletar o card original do Trello
     await trelloApi.delete(`/cards/${cardId}`);
 
-    onProgress?.({ current: 1, total: 1 });
+    onProgress?.({ current: 3, total: 3 });
 
     return {
       success: true,
