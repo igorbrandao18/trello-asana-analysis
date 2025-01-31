@@ -6,7 +6,7 @@ import styled from 'styled-components';
 import { theme } from '@/styles/theme';
 import StyledComponentsRegistry from '@/lib/registry';
 import { GlobalStyles } from '@/styles/global';
-import { IconHome, IconBriefcase, IconList, IconSettings, IconBrandTrello, IconBrandAsana, IconBell, IconUser } from '@tabler/icons-react';
+import { IconHome, IconBriefcase, IconList, IconSettings, IconBrandTrello, IconBrandAsana, IconBell, IconUser, IconArrowsExchange } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { trelloApi, asanaApi } from '@/services/api';
 
@@ -237,17 +237,17 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 <IconHome />
                 Dashboard
               </NavItem>
-              <NavItem href="/projects">
-                <IconBriefcase />
-                Projetos
+              <NavItem href="/migracao">
+                <IconArrowsExchange />
+                Migração
               </NavItem>
-              <NavItem href="/tasks">
-                <IconList />
-                Tarefas
+              <NavItem href="/trello">
+                <IconBrandTrello />
+                Trello
               </NavItem>
-              <NavItem href="/settings">
-                <IconSettings />
-                Configurações
+              <NavItem href="/asana">
+                <IconBrandAsana />
+                Asana
               </NavItem>
             </Nav>
           </Sidebar>
