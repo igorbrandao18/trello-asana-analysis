@@ -1,21 +1,21 @@
 import useSWR from 'swr';
-import { getDashboardData } from '@/services/api';
+// import { getDashboardData } from '@/services/api';
 import { DashboardData } from '@/types/dashboard';
 
 export function useDashboard() {
-  const { 
-    data, 
-    error, 
-    isLoading, 
-    mutate: refresh 
-  } = useSWR<DashboardData>('dashboard', getDashboardData, {
-    refreshInterval: 30000, // Atualiza a cada 30 segundos
-  });
+  // const { 
+  //   data, 
+  //   error, 
+  //   isLoading, 
+  //   mutate: refresh 
+  // } = useSWR<DashboardData>('dashboard', getDashboardData, {
+  //   refreshInterval: 30000, // Atualiza a cada 30 segundos
+  // });
 
   return {
-    data,
-    error,
-    isLoading,
-    refresh,
+    // data,
+    // error,
+    // isLoading,
+    // refresh,
   };
 } 
