@@ -6,7 +6,7 @@ import styled from 'styled-components';
 import { theme } from '@/styles/theme';
 import StyledComponentsRegistry from '@/lib/registry';
 import { GlobalStyles } from '@/styles/global';
-import { IconHome, IconBriefcase, IconList, IconSettings, IconBrandTrello, IconBrandAsana, IconBell, IconUser, IconArrowsExchange, IconTrash, IconRefresh, IconDatabaseImport } from '@tabler/icons-react';
+import { IconHome, IconBriefcase, IconList, IconSettings, IconBrandTrello, IconBrandAsana, IconBell, IconUser, IconArrowsExchange, IconTrash, IconRefresh, IconDatabaseImport, IconTableExport } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { trelloApi, asanaApi } from '@/services/api';
 import { migrationScripts } from '@/scripts/migration-data';
@@ -131,33 +131,41 @@ const ConnectionStatus = styled.div<{ isConnected: boolean }>`
   }
 `;
 
-const Nav = styled.nav`
-  padding: 0 var(--space-4);
-`;
-
-const NavItem = styled.a<{ active?: boolean }>`
+const NavItem = styled.a`
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  color: ${props => props.active ? 'var(--text-primary)' : 'var(--text-secondary)'};
-  background: ${props => props.active ? 'var(--bg-accent)' : 'transparent'};
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
-  margin-bottom: var(--space-1);
-  font-size: 0.875rem;
-  font-weight: 500;
+  padding: var(--space-2) var(--space-4);
+  color: var(--text-subtle);
+  text-decoration: none;
+  transition: all 0.2s;
 
   svg {
-    width: 18px;
-    height: 18px;
-    opacity: ${props => props.active ? 1 : 0.7};
+    width: 20px;
+    height: 20px;
   }
 
   &:hover {
     background: var(--bg-surface-hover);
-    color: var(--text-primary);
+    color: var(--text-default);
   }
+
+  &.active {
+    color: var(--text-default);
+    background: var(--bg-surface-hover);
+  }
+`;
+
+const MenuItem = styled(NavItem)<{ icon?: any }>`
+  svg {
+    opacity: 0.8;
+  }
+`;
+
+const Nav = styled.nav`
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 `;
 
 const HeaderActions = styled.div`
@@ -500,12 +508,22 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
               <NavSection>
                 <Nav>
-                  {menuItems.map((item, index) => (
-                    <NavItem key={index} href={item.href}>
-                      {item.icon}
-                      {item.label}
-                    </NavItem>
-                  ))}
+                  <MenuItem href="/endpoints/trello" icon={IconBrandTrello}>
+                    <IconBrandTrello />
+                    Endpoints Trello
+                  </MenuItem>
+                  <MenuItem href="/endpoints/asana" icon={IconBrandAsana}>
+                    <IconBrandAsana />
+                    Endpoints Asana
+                  </MenuItem>
+                  <MenuItem href="/mapeamento" icon={IconTableExport}>
+                    <IconTableExport />
+                    De-Para
+                  </MenuItem>
+                  <MenuItem href="/migracao" icon={IconArrowsExchange}>
+                    <IconArrowsExchange />
+                    Migração
+                  </MenuItem>
                 </Nav>
               </NavSection>
 
