@@ -385,8 +385,8 @@ const TransferArea = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 100;
-  width: 180px;
-  height: 180px;
+  width: 120px;
+  height: 120px;
 `;
 
 const TransferCircle = styled.div<{ active?: boolean }>`
@@ -403,18 +403,18 @@ const TransferCircle = styled.div<{ active?: boolean }>`
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.03);
-    border: 2px solid rgba(255, 255, 255, ${props => props.active ? '0.2' : '0.05'});
+    background: rgba(30, 42, 59, 0.1);
+    border: 1px solid rgba(30, 42, 59, ${props => props.active ? '0.3' : '0.1'});
     animation: pulse 2s ease-in-out infinite;
   }
 
   &::after {
     content: '';
     position: absolute;
-    width: 140%;
-    height: 140%;
+    width: 120%;
+    height: 120%;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, ${props => props.active ? '0.1' : '0.02'});
+    border: 1px solid rgba(30, 42, 59, ${props => props.active ? '0.2' : '0.05'});
     animation: pulse 2s ease-in-out infinite 0.3s;
   }
 
@@ -426,23 +426,23 @@ const TransferCircle = styled.div<{ active?: boolean }>`
 `;
 
 const TransferButton = styled.button<{ active?: boolean }>`
-  width: 120px;
-  height: 120px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   border: none;
   background: ${props => props.active ? 
-    'radial-gradient(circle at 30% 30%, #00b8d4, #0091ea)' : 
-    'radial-gradient(circle at 30% 30%, #455a64, #37474f)'
+    '#1e2a3b' : 
+    'rgba(30, 42, 59, 0.5)'
   };
   color: #ffffff;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
   cursor: ${props => props.active ? 'pointer' : 'not-allowed'};
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   position: relative;
   overflow: hidden;
 
@@ -453,24 +453,28 @@ const TransferButton = styled.button<{ active?: boolean }>`
     left: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 60%);
+    background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 60%);
     transform: rotate(0deg);
     animation: rotate 8s linear infinite;
   }
 
   &:hover:not(:disabled) {
     transform: scale(1.05);
-    box-shadow: 0 12px 48px rgba(0, 184, 212, 0.4);
+    background: ${props => props.active ? 
+      '#1e2a3b' : 
+      'rgba(30, 42, 59, 0.6)'
+    };
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
   }
 
   &:disabled {
-    opacity: 0.7;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 
   svg {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     transition: transform 0.3s ease;
   }
 
@@ -493,7 +497,7 @@ const TransferButton = styled.button<{ active?: boolean }>`
   }
 
   span {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     font-weight: 500;
   }
 `;
@@ -508,10 +512,10 @@ const ParticleEffect = styled.div<{ active?: boolean }>`
   &::after {
     content: '';
     position: absolute;
-    width: 8px;
-    height: 8px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
-    background: #00b8d4;
+    background: rgba(255, 255, 255, 0.5);
     opacity: ${props => props.active ? 1 : 0};
     transition: opacity 0.3s ease;
   }
@@ -530,7 +534,7 @@ const ParticleEffect = styled.div<{ active?: boolean }>`
 
   @keyframes float {
     0% { transform: translateY(0) scale(1); }
-    50% { transform: translateY(-10px) scale(1.2); }
+    50% { transform: translateY(-5px) scale(1.2); }
     100% { transform: translateY(0) scale(1); }
   }
 `;
@@ -612,7 +616,7 @@ export default function MigracaoPage() {
   const selectedTrelloProject = trelloProjects.find(p => p.id === selectedTrelloBoard);
 
   const handleMigration = async () => {
-    if (!selectedTrelloBoard || !selectedAsanaProject) return;
+    if (!selectedTrelloBoard) return;
     
     setMigrating(true);
     setProgress(0);
@@ -701,11 +705,10 @@ export default function MigracaoPage() {
       // Delay para mostrar o sucesso
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Limpar apenas as seleções e manter na mesma tela
+      // Limpar apenas a seleção do Trello
       setSelectedTrelloBoard(undefined);
-      setSelectedAsanaProject(undefined);
       
-      // Recarregar os dados para atualizar a visualização
+      // Recarregar os dados
       await Promise.all([
         loadTrelloProjects(),
         loadAsanaProjects()
@@ -796,13 +799,10 @@ export default function MigracaoPage() {
 
   const renderAsanaCard = (project: Project) => (
     <ProjectCard 
-      key={project.id} 
-      selected={selectedAsanaProject === project.id}
-      onClick={() => setSelectedAsanaProject(selectedAsanaProject === project.id ? undefined : project.id)}
+      key={project.id}
     >
       <div className="title">
         <span>{project.title}</span>
-        <IconChevronDown />
       </div>
       {project.description && (
         <div className="description">{project.description}</div>
@@ -814,61 +814,6 @@ export default function MigracaoPage() {
         <span className="separator">•</span>
         <span>{project.status}</span>
       </div>
-      {selectedAsanaProject === project.id && project.lists && (
-        <ProjectDetails>
-          <ListsContainer>
-            {project.lists.map(list => (
-              <ListColumn key={list.id}>
-                <ListHeader>
-                  <div className="list-title">
-                    <span>{list.name}</span>
-                  </div>
-                  <div className="list-meta">
-                    {list.cards.length} {list.cards.length === 1 ? 'tarefa' : 'tarefas'}
-                  </div>
-                </ListHeader>
-                <CardsList>
-                  {list.cards.map(card => (
-                    <Card key={card.id}>
-                      <div className="card-title">{card.name}</div>
-                      {card.description && (
-                        <div className="card-description">
-                          {card.description.split('\n').map((line, index) => (
-                            line.startsWith('🎯') || line.startsWith('📊') || line.startsWith('📅') || 
-                            line.startsWith('🏷️') || line.startsWith('⭐') || line.startsWith('📋') ? (
-                              <div key={index} style={{ marginBottom: '0.25rem' }}>{line}</div>
-                            ) : null
-                          ))}
-                        </div>
-                      )}
-                      <div className="card-meta">
-                        {card.due && (
-                          <span className="meta-item">
-                            <IconCalendar />
-                            {new Date(card.due).toLocaleDateString()}
-                          </span>
-                        )}
-                        {card.labels && card.labels.length > 0 && (
-                          <span className="meta-item">
-                            <IconTag />
-                            {card.labels.length} etiquetas
-                          </span>
-                        )}
-                        {card.members && card.members.length > 0 && (
-                          <span className="meta-item">
-                            <IconUsers />
-                            {card.members.length} membros
-                          </span>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                </CardsList>
-              </ListColumn>
-            ))}
-          </ListsContainer>
-        </ProjectDetails>
-      )}
     </ProjectCard>
   );
 
@@ -918,11 +863,11 @@ export default function MigracaoPage() {
         </SourcePanel>
 
         <TransferArea>
-          <TransferCircle active={!!selectedTrelloBoard && !!selectedAsanaProject}>
-            <ParticleEffect active={!!selectedTrelloBoard && !!selectedAsanaProject} />
+          <TransferCircle active={!!selectedTrelloBoard}>
+            <ParticleEffect active={!!selectedTrelloBoard} />
             <TransferButton
-              active={!!selectedTrelloBoard && !!selectedAsanaProject}
-              disabled={!selectedTrelloBoard || !selectedAsanaProject || migrating}
+              active={!!selectedTrelloBoard}
+              disabled={!selectedTrelloBoard || migrating}
               onClick={handleMigration}
             >
               {migrating ? (
