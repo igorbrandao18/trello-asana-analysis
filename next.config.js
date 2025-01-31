@@ -10,6 +10,11 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: '/',
+        destination: '/migracao',
+        permanent: false,
+      },
+      {
         source: '/health',
         destination: '/api/health',
         permanent: true,

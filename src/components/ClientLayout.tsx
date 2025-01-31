@@ -386,7 +386,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Força um refresh completo da página
-      window.location.href = '/dashboard';
+      window.location.href = '/migracao';
     } catch (error) {
       console.error('Erro ao limpar dados:', error);
       setCurrentTask('Erro ao limpar dados. Tente novamente.');
@@ -406,7 +406,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     setStatus('processing');
     
     try {
-      // Trello Setup
+      // Criando board no Trello
       setCurrentTask('Configurando board do Sistema de Delivery...');
       setProgress(5);
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -440,7 +440,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       setCurrentTask('Criando seções de acompanhamento...');
       setProgress(75);
       await new Promise(resolve => setTimeout(resolve, 800));
-
+      
       setCurrentTask('Registrando métricas e metas...');
       setProgress(85);
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -458,7 +458,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       // Delay para mostrar sucesso
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      window.location.href = '/dashboard';
+      // Redireciona para a página de migração
+      window.location.href = '/migracao';
+      
     } catch (error) {
       console.error('Erro ao criar dados:', error);
       setCurrentTask('Erro ao configurar o sistema. Por favor, tente novamente.');
