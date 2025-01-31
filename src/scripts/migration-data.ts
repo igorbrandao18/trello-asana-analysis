@@ -1,4 +1,53 @@
-import { trelloApi, asanaApi } from '../services/api';
+import { trelloApi, asanaApi } from '@/services/api';
+
+const RESTAURANTS = [
+  {
+    name: "Sabor Oriental Sushi",
+    category: "Japonês",
+    rating: 4.8,
+    menu: [
+      { name: "Combo 30 Peças", price: 89.90, description: "10 hossomakis, 10 uramakis e 10 niguiris variados" },
+      { name: "Hot Roll Especial", price: 32.90, description: "8 peças de hot roll com salmão grelhado e cream cheese" },
+      { name: "Temaki Salmão", price: 28.90, description: "Temaki de salmão fresco com cream cheese e cebolinha" }
+    ]
+  },
+  {
+    name: "La Pasta Autêntica",
+    category: "Italiano",
+    rating: 4.7,
+    menu: [
+      { name: "Fettuccine ao Funghi", price: 58.90, description: "Massa fresca com mix de cogumelos e creme de leite fresco" },
+      { name: "Lasanha Bolonhesa", price: 49.90, description: "Lasanha artesanal com molho bolonhesa e bechamel" },
+      { name: "Ravioli de Mozzarella", price: 54.90, description: "Massa recheada com mozzarella ao sugo" }
+    ]
+  },
+  {
+    name: "Burger House Premium",
+    category: "Hambúrguer",
+    rating: 4.6,
+    menu: [
+      { name: "Classic Cheese", price: 32.90, description: "Blend 180g, cheddar, alface, tomate e molho especial" },
+      { name: "BBQ Bacon", price: 38.90, description: "Blend 180g, bacon crocante, cebola caramelizada e molho BBQ" },
+      { name: "Veggie Supreme", price: 34.90, description: "Hambúrguer de grão de bico, abacate e maionese vegana" }
+    ]
+  }
+];
+
+const DELIVERY_STATUSES = [
+  "🟡 Pedido Recebido",
+  "🟠 Em Preparação",
+  "🔵 Saiu para Entrega",
+  "🟢 Entregue",
+  "⚪ Cancelado"
+];
+
+const CUSTOMER_REVIEWS = [
+  "Comida excelente! Entrega rápida e embalagem muito bem feita.",
+  "Pedido chegou no tempo previsto e a temperatura estava perfeita.",
+  "Ótimo custo-benefício. Com certeza pedirei novamente!",
+  "A apresentação do prato superou minhas expectativas.",
+  "Porções generosas e sabor incrível."
+];
 
 // Script para limpar dados
 async function cleanupData() {
@@ -157,8 +206,180 @@ async function populateWorkData() {
   }
 }
 
-// Exportar funções para uso via CLI ou importação
 export const migrationScripts = {
   cleanup: cleanupData,
   populate: populateWorkData,
+  async populate() {
+    try {
+      // Criando board principal no Trello
+      const mainBoard = await trelloApi.post('/boards', {
+        name: 'Sistema de Delivery',
+        desc: 'Gestão completa do sistema de delivery com pedidos, restaurantes e avaliações',
+        defaultLists: false,
+      });
+
+      // Criando listas para diferentes aspectos do negócio
+      const lists = await Promise.all([
+        trelloApi.post(`/boards/${mainBoard.data.id}/lists`, { name: '📋 Novos Pedidos' }),
+        trelloApi.post(`/boards/${mainBoard.data.id}/lists`, { name: '👨‍🍳 Em Preparação' }),
+        trelloApi.post(`/boards/${mainBoard.data.id}/lists`, { name: '🛵 Em Entrega' }),
+        trelloApi.post(`/boards/${mainBoard.data.id}/lists`, { name: '✅ Entregues' }),
+        trelloApi.post(`/boards/${mainBoard.data.id}/lists`, { name: '⭐ Avaliações' })
+      ]);
+
+      // Criando labels para categorização
+      const labels = await Promise.all([
+        trelloApi.post(`/boards/${mainBoard.data.id}/labels`, { name: 'Urgente', color: 'red' }),
+        trelloApi.post(`/boards/${mainBoard.data.id}/labels`, { name: 'VIP', color: 'purple' }),
+        trelloApi.post(`/boards/${mainBoard.data.id}/labels`, { name: 'Novo Cliente', color: 'green' }),
+        trelloApi.post(`/boards/${mainBoard.data.id}/labels`, { name: 'Pedido Grande', color: 'yellow' })
+      ]);
+
+      // Criando cards de pedidos com dados realistas
+      for (const restaurant of RESTAURANTS) {
+        for (let i = 0; i < 3; i++) {
+          const randomMenu = restaurant.menu[Math.floor(Math.random() * restaurant.menu.length)];
+          const randomStatus = Math.floor(Math.random() * 3);
+          const isVIP = Math.random() > 0.7;
+          const isUrgent = Math.random() > 0.8;
+
+          await trelloApi.post('/cards', {
+            idList: lists[randomStatus].data.id,
+            name: `Pedido #${Math.floor(Math.random() * 9000) + 1000} - ${restaurant.name}`,
+            desc: `🍽️ Item: ${randomMenu.name}\n` +
+                  `💰 Valor: R$ ${randomMenu.price.toFixed(2)}\n` +
+                  `📝 Observações: ${randomMenu.description}\n` +
+                  `⭐ Avaliação do Restaurante: ${restaurant.rating}\n` +
+                  `🏷️ Categoria: ${restaurant.category}`,
+            idLabels: [
+              ...(isVIP ? [labels[1].data.id] : []),
+              ...(isUrgent ? [labels[0].data.id] : [])
+            ]
+          });
+        }
+
+        // Criando avaliações para cada restaurante
+        const randomReview = CUSTOMER_REVIEWS[Math.floor(Math.random() * CUSTOMER_REVIEWS.length)];
+        await trelloApi.post('/cards', {
+          idList: lists[4].data.id,
+          name: `Avaliação - ${restaurant.name}`,
+          desc: `⭐ ${restaurant.rating}/5.0\n\n"${randomReview}"\n\n📅 ${new Date().toLocaleDateString()}`,
+          idLabels: restaurant.rating >= 4.7 ? [labels[1].data.id] : []
+        });
+      }
+
+      // Criando projeto no Asana
+      const user = await asanaApi.get('/users/me');
+      const workspaceId = user.data.data.workspaces[0].gid;
+      
+      const deliveryProject = await asanaApi.post('/projects', {
+        data: {
+          name: 'Gestão de Delivery',
+          workspace: workspaceId,
+          notes: 'Sistema completo de gestão de delivery com pedidos, restaurantes e avaliações'
+        }
+      });
+
+      // Criando seções no Asana
+      const sections = await Promise.all([
+        asanaApi.post('/sections', {
+          data: {
+            project: deliveryProject.data.data.gid,
+            name: '🏪 Restaurantes Parceiros'
+          }
+        }),
+        asanaApi.post('/sections', {
+          data: {
+            project: deliveryProject.data.data.gid,
+            name: '📊 Métricas e Desempenho'
+          }
+        }),
+        asanaApi.post('/sections', {
+          data: {
+            project: deliveryProject.data.data.gid,
+            name: '📈 Metas Mensais'
+          }
+        })
+      ]);
+
+      // Criando tarefas para cada restaurante
+      for (const restaurant of RESTAURANTS) {
+        await asanaApi.post('/tasks', {
+          data: {
+            workspace: workspaceId,
+            projects: [deliveryProject.data.data.gid],
+            name: restaurant.name,
+            notes: `🏷️ Categoria: ${restaurant.category}\n` +
+                  `⭐ Avaliação: ${restaurant.rating}/5.0\n\n` +
+                  `📋 Cardápio:\n` +
+                  restaurant.menu.map(item => 
+                    `• ${item.name} - R$ ${item.price.toFixed(2)}\n  ${item.description}`
+                  ).join('\n\n'),
+            memberships: [
+              {
+                project: deliveryProject.data.data.gid,
+                section: sections[0].data.data.gid
+              }
+            ]
+          }
+        });
+      }
+
+      // Criando métricas de desempenho
+      const metrics = [
+        { name: 'Taxa de Entrega no Prazo', target: '95%', current: '93.5%' },
+        { name: 'Satisfação do Cliente', target: '4.8/5.0', current: '4.6/5.0' },
+        { name: 'Tempo Médio de Entrega', target: '35 min', current: '38 min' }
+      ];
+
+      for (const metric of metrics) {
+        await asanaApi.post('/tasks', {
+          data: {
+            workspace: workspaceId,
+            projects: [deliveryProject.data.data.gid],
+            name: metric.name,
+            notes: `🎯 Meta: ${metric.target}\n` +
+                  `📊 Atual: ${metric.current}\n\n` +
+                  `Atualizado em: ${new Date().toLocaleDateString()}`,
+            memberships: [
+              {
+                project: deliveryProject.data.data.gid,
+                section: sections[1].data.data.gid
+              }
+            ]
+          }
+        });
+      }
+
+      // Criando metas mensais
+      const goals = [
+        { name: 'Aumentar Base de Restaurantes', target: '+15 novos parceiros' },
+        { name: 'Reduzir Tempo de Entrega', target: '-5 minutos em média' },
+        { name: 'Melhorar Rating Médio', target: 'Atingir 4.8/5.0' }
+      ];
+
+      for (const goal of goals) {
+        await asanaApi.post('/tasks', {
+          data: {
+            workspace: workspaceId,
+            projects: [deliveryProject.data.data.gid],
+            name: goal.name,
+            notes: `🎯 Meta: ${goal.target}\n` +
+                  `📅 Prazo: ${new Date(Date.now() + 30*24*60*60*1000).toLocaleDateString()}`,
+            memberships: [
+              {
+                project: deliveryProject.data.data.gid,
+                section: sections[2].data.data.gid
+              }
+            ]
+          }
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Erro ao popular dados:', error);
+      throw error;
+    }
+  }
 }; 

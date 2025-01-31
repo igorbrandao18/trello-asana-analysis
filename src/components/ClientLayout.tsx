@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { ThemeProvider } from 'styled-components';
 import styled from 'styled-components';
 import { theme } from '@/styles/theme';
@@ -76,50 +76,58 @@ const Logo = styled.div`
 
 const ConnectionPanel = styled.div`
   margin: 0 var(--space-4) var(--space-4);
-  padding: var(--space-3);
+  padding: var(--space-4);
   background: var(--bg-surface-hover);
   border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  justify-content: center;
 `;
 
-const ConnectionItem = styled.div`
+const ConnectionStatus = styled.div<{ isConnected: boolean }>`
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2);
+  padding: var(--space-3);
   background: var(--bg-surface);
   border-radius: var(--radius-md);
-  margin-bottom: var(--space-2);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  &:hover {
-    background: var(--bg-surface-hover);
-  }
+  position: relative;
 
   svg {
-    width: 18px;
-    height: 18px;
-    color: var(--text-accent);
-  }
-
-  .connection-info {
-    flex: 1;
-    font-size: 0.875rem;
-
-    small {
-      font-size: 0.75rem;
-    }
+    width: 24px;
+    height: 24px;
+    color: ${props => props.isConnected ? 'var(--text-accent)' : 'var(--text-secondary)'};
+    opacity: ${props => props.isConnected ? 1 : 0.5};
+    transition: all 0.3s ease;
   }
 
   .status {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     border-radius: var(--radius-full);
-    background: var(--status-success);
+    background: ${props => props.isConnected ? 'var(--status-success)' : 'var(--status-error)'};
+    transition: all 0.3s ease;
+    position: relative;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: -3px;
+      right: -3px;
+      bottom: -3px;
+      border-radius: var(--radius-full);
+      background: ${props => props.isConnected ? 'var(--status-success)' : 'var(--status-error)'};
+      opacity: 0.2;
+      animation: ${props => props.isConnected ? 'pulse 2s infinite' : 'none'};
+    }
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 0.2; }
+    50% { transform: scale(2.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 0.2; }
   }
 `;
 
@@ -244,6 +252,35 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const [currentTask, setCurrentTask] = useState('');
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [trelloConnected, setTrelloConnected] = useState(false);
+  const [asanaConnected, setAsanaConnected] = useState(false);
+
+  const checkConnections = async () => {
+    try {
+      const trelloResponse = await trelloApi.get('/members/me', { timeout: 5000 });
+      setTrelloConnected(true);
+    } catch (error) {
+      setTrelloConnected(false);
+    }
+
+    try {
+      const asanaResponse = await asanaApi.get('/users/me', { timeout: 5000 });
+      setAsanaConnected(true);
+    } catch (error) {
+      setAsanaConnected(false);
+    }
+  };
+
+  useEffect(() => {
+    // Verifica conexão imediatamente ao montar
+    checkConnections();
+
+    // Configura verificação periódica a cada 30 segundos
+    const interval = setInterval(checkConnections, 30000);
+
+    // Limpa o intervalo ao desmontar
+    return () => clearInterval(interval);
+  }, []);
 
   const handleTrelloClick = async () => {
     try {
@@ -306,7 +343,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       for (let i = 0; i < totalBoards; i++) {
         await trelloApi.delete(`/boards/${trelloBoards.data[i].id}`);
         setProgress(Math.round((i + 1) / (totalBoards + 5) * 50));
-        await new Promise(resolve => setTimeout(resolve, 300)); // Pequeno delay para animação
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
 
       setCurrentTask('Removendo projetos do Asana...');
@@ -318,9 +355,16 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       for (let i = 0; i < totalProjects; i++) {
         await asanaApi.delete(`/projects/${asanaProjects.data.data[i].gid}`);
         setProgress(50 + Math.round((i + 1) / (totalProjects + 5) * 50));
-        await new Promise(resolve => setTimeout(resolve, 300)); // Pequeno delay para animação
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
 
+      // Limpa a sessão de migração
+      setCurrentTask('Limpando sessão de migração...');
+      localStorage.removeItem('migrationSession');
+      localStorage.removeItem('selectedBoards');
+      localStorage.removeItem('selectedProjects');
+      sessionStorage.clear();
+      
       setProgress(100);
       setCurrentTask('Todos os dados foram removidos com sucesso!');
       setStatus('success');
@@ -328,7 +372,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       // Delay para mostrar sucesso
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      router.refresh();
+      // Força um refresh completo da página
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('Erro ao limpar dados:', error);
       setCurrentTask('Erro ao limpar dados. Tente novamente.');
@@ -348,35 +393,62 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     setStatus('processing');
     
     try {
-      setCurrentTask('Preparando ambiente...');
-      setProgress(10);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Trello Setup
+      setCurrentTask('Configurando board do Sistema de Delivery...');
+      setProgress(5);
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      setCurrentTask('Criando boards no Trello...');
-      setProgress(30);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setCurrentTask('Criando listas de acompanhamento de pedidos...');
+      setProgress(15);
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      setCurrentTask('Configurando listas e labels...');
-      setProgress(50);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setCurrentTask('Configurando etiquetas e categorias...');
+      setProgress(25);
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Restaurantes e Pedidos
+      setCurrentTask('Cadastrando restaurante Sabor Oriental Sushi...');
+      setProgress(35);
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setCurrentTask('Cadastrando restaurante La Pasta Autêntica...');
+      setProgress(45);
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setCurrentTask('Cadastrando restaurante Burger House Premium...');
+      setProgress(55);
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Asana Setup
+      setCurrentTask('Configurando projeto de Gestão de Delivery...');
+      setProgress(65);
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setCurrentTask('Criando seções de acompanhamento...');
+      setProgress(75);
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setCurrentTask('Registrando métricas e metas...');
+      setProgress(85);
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       await migrationScripts.populate();
       
-      setCurrentTask('Finalizando configurações...');
-      setProgress(90);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setCurrentTask('Finalizando configurações e validando dados...');
+      setProgress(95);
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       setProgress(100);
-      setCurrentTask('Dados de exemplo criados com sucesso!');
+      setCurrentTask('Sistema de Delivery configurado com sucesso! 🎉');
       setStatus('success');
       
       // Delay para mostrar sucesso
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      router.refresh();
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('Erro ao criar dados:', error);
-      setCurrentTask('Erro ao criar dados. Tente novamente.');
+      setCurrentTask('Erro ao configurar o sistema. Por favor, tente novamente.');
       setStatus('error');
       await new Promise(resolve => setTimeout(resolve, 2000));
     } finally {
@@ -400,22 +472,14 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                 </Logo>
                 
                 <ConnectionPanel>
-                  <ConnectionItem onClick={handleTrelloClick}>
+                  <ConnectionStatus isConnected={trelloConnected}>
                     <IconBrandTrello />
-                    <div className="connection-info">
-                      <div>Trello</div>
-                      <small style={{ color: 'var(--text-secondary)' }}>Conectado</small>
-                    </div>
                     <div className="status" />
-                  </ConnectionItem>
-                  <ConnectionItem onClick={handleAsanaClick}>
+                  </ConnectionStatus>
+                  <ConnectionStatus isConnected={asanaConnected}>
                     <IconBrandAsana />
-                    <div className="connection-info">
-                      <div>Asana</div>
-                      <small style={{ color: 'var(--text-secondary)' }}>Conectado</small>
-                    </div>
                     <div className="status" />
-                  </ConnectionItem>
+                  </ConnectionStatus>
                 </ConnectionPanel>
               </TopSection>
 
@@ -428,14 +492,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                   <NavItem href="/migracao">
                     <IconArrowsExchange />
                     Migração
-                  </NavItem>
-                  <NavItem href="/trello">
-                    <IconBrandTrello />
-                    Trello
-                  </NavItem>
-                  <NavItem href="/asana">
-                    <IconBrandAsana />
-                    Asana
                   </NavItem>
                 </Nav>
               </NavSection>
