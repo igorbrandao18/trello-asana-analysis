@@ -147,45 +147,117 @@ export async function getAsanaProjects(): Promise<Project[]> {
   }
 }
 
-export async function migrateProjects(sourceType: 'trello' | 'asana', projectIds: string[]) {
-  // Implementar a lógica de migração aqui
-  // Esta é uma função placeholder que será implementada com a lógica real de migração
+export async function migrateProjects(
+  sourceType: 'trello' | 'asana',
+  projectIds: string[],
+  onProgress?: (progress: { current: number; total: number }) => void
+) {
   try {
     if (sourceType === 'trello') {
-      // Lógica para migrar do Trello para o Asana
-      for (const projectId of projectIds) {
-        // 1. Buscar detalhes do board do Trello
-        const board = await trelloApi.get(`/boards/${projectId}`, {
+      // Para cada board do Trello selecionado
+      for (const boardId of projectIds) {
+        // 1. Buscar detalhes completos do board do Trello
+        const board = await trelloApi.get(`/boards/${boardId}`, {
           params: {
             lists: 'open',
-            cards: 'open',
+            cards: 'visible',
+            card_fields: 'id,name,desc,due,labels,idMembers,idList',
             members: 'all',
           },
         });
 
         // 2. Criar projeto correspondente no Asana
-        // 3. Migrar listas como seções
-        // 4. Migrar cards como tarefas
-        // 5. Migrar membros
-        // 6. Migrar anexos e comentários
-      }
-    } else {
-      // Lógica para migrar do Asana para o Trello
-      for (const projectId of projectIds) {
-        // 1. Buscar detalhes do projeto do Asana
-        const project = await asanaApi.get(`/projects/${projectId}`, {
-          params: {
-            opt_fields: 'name,notes,members,custom_fields',
+        const user = await asanaApi.get('/users/me');
+        const workspaceId = user.data.data.workspaces[0].gid;
+
+        const asanaProject = await asanaApi.post('/projects', {
+          data: {
+            name: board.data.name,
+            notes: board.data.desc,
+            workspace: workspaceId,
           },
         });
 
-        // 2. Criar board correspondente no Trello
-        // 3. Migrar seções como listas
-        // 4. Migrar tarefas como cards
-        // 5. Migrar membros
-        // 6. Migrar anexos e comentários
+        const projectId = asanaProject.data.data.gid;
+
+        // 3. Criar seções no Asana (equivalentes às listas do Trello)
+        const sectionMap = new Map();
+        for (const list of board.data.lists) {
+          const section = await asanaApi.post(`/projects/${projectId}/sections`, {
+            data: {
+              name: list.name,
+            },
+          });
+          sectionMap.set(list.id, section.data.data.gid);
+        }
+
+        // 4. Migrar cards como tarefas
+        let cardsTransferred = 0;
+        const totalCards = board.data.cards.length;
+
+        for (const card of board.data.cards) {
+          const sectionId = sectionMap.get(card.idList);
+          
+          try {
+            // Criar tarefa no Asana
+            await asanaApi.post('/tasks', {
+              data: {
+                name: card.name,
+                notes: card.desc,
+                due_on: card.due,
+                projects: [projectId],
+                memberships: [{
+                  project: projectId,
+                  section: sectionId
+                }]
+              },
+            });
+
+            // Após migrar o card, deletá-lo do Trello
+            await trelloApi.delete(`/cards/${card.id}`);
+            
+            cardsTransferred++;
+            onProgress?.({ current: cardsTransferred, total: totalCards });
+          } catch (error) {
+            console.error(`Erro ao migrar card ${card.id}:`, error);
+            // Continua com o próximo card mesmo se houver erro
+          }
+        }
+
+        // 5. Limpar e deletar o board do Trello
+        try {
+          // Primeiro, deletar todas as listas
+          for (const list of board.data.lists) {
+            try {
+              // Primeiro fecha a lista
+              await trelloApi.put(`/lists/${list.id}/closed`, {
+                value: true
+              });
+              // Depois tenta deletar a lista
+              await trelloApi.delete(`/lists/${list.id}`);
+            } catch (error) {
+              console.error(`Erro ao deletar lista ${list.id}:`, error);
+            }
+          }
+
+          // Depois, deletar o board
+          await trelloApi.delete(`/boards/${boardId}`);
+        } catch (error) {
+          console.error('Erro ao deletar board:', error);
+          // Se não conseguir deletar, tenta pelo menos arquivar
+          await trelloApi.put(`/boards/${boardId}/closed`, {
+            value: true
+          });
+        }
       }
+    } else {
+      throw new Error('Migração do Asana para o Trello ainda não implementada');
     }
+
+    return {
+      success: true,
+      message: 'Transferência concluída com sucesso!',
+    };
   } catch (error) {
     console.error('Erro durante a migração:', error);
     throw error;

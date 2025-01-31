@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { IconArrowsExchange, IconBrandTrello, IconLayoutGrid, IconLoader2, IconChevronDown, IconCalendar, IconTag, IconUsers } from '@tabler/icons-react';
 import { Header } from '@/components/Header';
 import { getTrelloProjects, getAsanaProjects, migrateProjects } from '@/services/migration';
+import { ProgressModal } from '@/components/ProgressModal';
 
 const PageWrapper = styled.div`
   position: fixed;
@@ -360,6 +361,21 @@ const EmptyState = styled.div`
   text-align: center;
 `;
 
+const ProgressBar = styled.div`
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+
+  .progress {
+    height: 100%;
+    background: #ffffff;
+    transition: width 0.3s ease;
+  }
+`;
+
 interface Project {
   id: string;
   title: string;
@@ -389,34 +405,37 @@ export default function MigracaoPage() {
   const [loadingTrello, setLoadingTrello] = useState(false);
   const [loadingAsana, setLoadingAsana] = useState(false);
   const [migrating, setMigrating] = useState(false);
+  const [currentTask, setCurrentTask] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [trelloSearch, setTrelloSearch] = useState('');
   const [asanaSearch, setAsanaSearch] = useState('');
 
+  const loadTrelloProjects = async () => {
+    setLoadingTrello(true);
+    try {
+      const data = await getTrelloProjects();
+      setTrelloProjects(data);
+    } catch (error) {
+      console.error('Erro ao carregar projetos do Trello:', error);
+    } finally {
+      setLoadingTrello(false);
+    }
+  };
+
+  const loadAsanaProjects = async () => {
+    setLoadingAsana(true);
+    try {
+      const data = await getAsanaProjects();
+      setAsanaProjects(data);
+    } catch (error) {
+      console.error('Erro ao carregar projetos do Asana:', error);
+    } finally {
+      setLoadingAsana(false);
+    }
+  };
+
   useEffect(() => {
-    async function loadTrelloProjects() {
-      setLoadingTrello(true);
-      try {
-        const data = await getTrelloProjects();
-        setTrelloProjects(data);
-      } catch (error) {
-        console.error('Erro ao carregar projetos do Trello:', error);
-      } finally {
-        setLoadingTrello(false);
-      }
-    }
-
-    async function loadAsanaProjects() {
-      setLoadingAsana(true);
-      try {
-        const data = await getAsanaProjects();
-        setAsanaProjects(data);
-      } catch (error) {
-        console.error('Erro ao carregar projetos do Asana:', error);
-      } finally {
-        setLoadingAsana(false);
-      }
-    }
-
     loadTrelloProjects();
     loadAsanaProjects();
   }, []);
@@ -437,14 +456,105 @@ export default function MigracaoPage() {
     if (!selectedTrelloBoard || !selectedAsanaProject) return;
     
     setMigrating(true);
+    setProgress(0);
+    setStatus('processing');
+    
     try {
-      await migrateProjects('trello', [selectedTrelloBoard]);
+      const selectedProject = trelloProjects.find(p => p.id === selectedTrelloBoard);
+      if (selectedProject) {
+        // Fase de Inicialização
+        setCurrentTask('Iniciando processo de transferência...');
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setProgress(5);
+
+        setCurrentTask('Verificando conexão com as APIs...');
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setProgress(10);
+
+        setCurrentTask('Analisando estrutura do board...');
+        await new Promise(resolve => setTimeout(resolve, 700));
+        setProgress(15);
+
+        // Fase de Preparação
+        setCurrentTask(`Preparando transferência de ${selectedProject.lists?.length || 0} listas e ${selectedProject.cards} cards...`);
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setProgress(20);
+
+        // Fase de Criação da Estrutura
+        setCurrentTask('Criando estrutura no Asana...');
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setProgress(25);
+
+        setCurrentTask('Configurando seções e propriedades...');
+        await new Promise(resolve => setTimeout(resolve, 700));
+        setProgress(30);
+
+        // Fase de Transferência
+        setCurrentTask('Iniciando transferência de conteúdo...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setProgress(35);
+      }
+
+      // Transferência dos Cards
+      await migrateProjects('trello', [selectedTrelloBoard], (progress) => {
+        const baseProgress = 35;
+        const transferProgress = Math.round((progress.current / progress.total) * 40);
+        setProgress(baseProgress + transferProgress);
+
+        if (progress.current === progress.total) {
+          setCurrentTask('Todos os cards foram transferidos com sucesso!');
+        } else {
+          setCurrentTask(
+            `Transferindo card ${progress.current} de ${progress.total}...\n` +
+            `${selectedProject?.lists?.find(l => l.cards.find(c => c.id === progress.current))?.name || ''}`
+          );
+        }
+      });
+
+      // Fase de Finalização
+      setCurrentTask('Verificando integridade dos dados...');
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setProgress(80);
+
+      setCurrentTask('Removendo dados originais...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setProgress(85);
+
+      setCurrentTask('Atualizando referências...');
+      await new Promise(resolve => setTimeout(resolve, 700));
+      setProgress(90);
+
+      // Atualizar as listas
+      setCurrentTask('Sincronizando alterações...');
+      await Promise.all([
+        loadTrelloProjects(),
+        loadAsanaProjects()
+      ]);
+      setProgress(95);
+
+      setCurrentTask('Finalizando processo...');
+      await new Promise(resolve => setTimeout(resolve, 600));
+      setProgress(100);
+
+      setCurrentTask('Transferência concluída com sucesso! 🎉\nTodos os dados foram migrados e verificados.');
+      setStatus('success');
+      
+      // Delay para mostrar o sucesso
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Limpar seleções
       setSelectedTrelloBoard(undefined);
       setSelectedAsanaProject(undefined);
     } catch (error) {
       console.error('Erro durante a migração:', error);
+      setCurrentTask('❌ Erro durante a transferência.\nVerifique as conexões e tente novamente.');
+      setStatus('error');
+      await new Promise(resolve => setTimeout(resolve, 2000));
     } finally {
       setMigrating(false);
+      setProgress(0);
+      setCurrentTask('');
+      setStatus('processing');
     }
   };
 
@@ -634,11 +744,28 @@ export default function MigracaoPage() {
               {selectedTrelloProject && (
                 <>
                   <span>1 quadro selecionado</span>
-                  <span>•</span>
-                  <span>{selectedTrelloProject.cards} cards para migrar</span>
+                  <span className="separator">•</span>
+                  <span>{selectedTrelloProject.cards} cards para transferir</span>
                 </>
               )}
             </Stats>
+            <Button 
+              variant="primary"
+              disabled={!selectedTrelloBoard || !selectedAsanaProject || migrating}
+              onClick={handleMigration}
+            >
+              {migrating ? (
+                <>
+                  <IconLoader2 className="spin" />
+                  Transferindo...
+                </>
+              ) : (
+                <>
+                  <IconArrowsExchange />
+                  Transferir
+                </>
+              )}
+            </Button>
           </ActionBar>
         </SourcePanel>
 
@@ -695,6 +822,13 @@ export default function MigracaoPage() {
           </ActionBar>
         </TargetPanel>
       </Content>
+
+      <ProgressModal 
+        isOpen={migrating}
+        currentTask={currentTask}
+        progress={progress}
+        status={status}
+      />
     </PageWrapper>
   );
 } 

@@ -245,6 +245,19 @@ const ActionButton = styled.button`
   }
 `;
 
+const menuItems = [
+  {
+    icon: <IconArrowsExchange />,
+    label: 'Migração',
+    href: '/migracao',
+  },
+  {
+    icon: <IconSettings />,
+    label: 'Configurações',
+    href: '/configuracoes',
+  },
+];
+
 export function ClientLayout({ children }: ClientLayoutProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -485,14 +498,12 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
               <NavSection>
                 <Nav>
-                  <NavItem href="/dashboard">
-                    <IconHome />
-                    Dashboard
-                  </NavItem>
-                  <NavItem href="/migracao">
-                    <IconArrowsExchange />
-                    Migração
-                  </NavItem>
+                  {menuItems.map((item, index) => (
+                    <NavItem key={index} href={item.href}>
+                      {item.icon}
+                      {item.label}
+                    </NavItem>
+                  ))}
                 </Nav>
               </NavSection>
 
