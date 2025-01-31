@@ -562,7 +562,7 @@ export default function MigracaoPage() {
     <ProjectCard 
       key={project.id} 
       selected={selectedTrelloBoard === project.id}
-      onClick={() => setSelectedTrelloBoard(project.id)}
+      onClick={() => setSelectedTrelloBoard(selectedTrelloBoard === project.id ? undefined : project.id)}
     >
       <div className="title">
         <span>{project.title}</span>
@@ -633,7 +633,7 @@ export default function MigracaoPage() {
     <ProjectCard 
       key={project.id} 
       selected={selectedAsanaProject === project.id}
-      onClick={() => setSelectedAsanaProject(project.id)}
+      onClick={() => setSelectedAsanaProject(selectedAsanaProject === project.id ? undefined : project.id)}
     >
       <div className="title">
         <span>{project.title}</span>
