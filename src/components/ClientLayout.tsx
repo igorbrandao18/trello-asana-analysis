@@ -1,14 +1,17 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { ThemeProvider } from 'styled-components';
 import styled from 'styled-components';
 import { theme } from '@/styles/theme';
 import StyledComponentsRegistry from '@/lib/registry';
 import { GlobalStyles } from '@/styles/global';
-import { IconHome, IconBriefcase, IconList, IconSettings, IconBrandTrello, IconBrandAsana, IconBell, IconUser, IconArrowsExchange } from '@tabler/icons-react';
+import { IconHome, IconBriefcase, IconList, IconSettings, IconBrandTrello, IconBrandAsana, IconBell, IconUser, IconArrowsExchange, IconTrash, IconRefresh, IconDatabaseImport } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { trelloApi, asanaApi } from '@/services/api';
+import { migrationScripts } from '@/scripts/migration-data';
+import { ProgressModal } from './ProgressModal';
+import { ConfirmModal } from './ConfirmModal';
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -24,25 +27,44 @@ const Sidebar = styled.aside`
   width: var(--sidebar-width);
   background: var(--bg-surface);
   border-right: 1px solid var(--border-subtle);
-  display: flex;
-  flex-direction: column;
   position: fixed;
   top: 0;
   bottom: 0;
   left: 0;
-  padding: var(--space-6) 0;
+  overflow: hidden;
 `;
 
-const MainWrapper = styled.div`
+const SidebarContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: var(--space-4) 0;
+`;
+
+const TopSection = styled.div`
+  flex-shrink: 0;
+`;
+
+const NavSection = styled.div`
   flex: 1;
-  margin-left: var(--sidebar-width);
-  min-height: 100vh;
+  overflow-y: auto;
+  margin: var(--space-2) 0;
+
+  /* Esconde a scrollbar mas mantém a funcionalidade */
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+`;
+
+const BottomSection = styled.div`
+  padding: 0 var(--space-4) var(--space-2);
 `;
 
 const Logo = styled.div`
-  padding: 0 var(--space-6);
-  margin-bottom: var(--space-6);
-  font-size: 1.5rem;
+  padding: 0 var(--space-4);
+  margin-bottom: var(--space-4);
+  font-size: 1.25rem;
   font-weight: 700;
   
   span {
@@ -53,8 +75,8 @@ const Logo = styled.div`
 `;
 
 const ConnectionPanel = styled.div`
-  margin: 0 var(--space-4) var(--space-6);
-  padding: var(--space-4);
+  margin: 0 var(--space-4) var(--space-4);
+  padding: var(--space-3);
   background: var(--bg-surface-hover);
   border-radius: var(--radius-lg);
 `;
@@ -63,30 +85,39 @@ const ConnectionItem = styled.div`
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-2);
   background: var(--bg-surface);
   border-radius: var(--radius-md);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
   cursor: pointer;
   transition: all var(--transition-fast);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   &:hover {
     background: var(--bg-surface-hover);
   }
 
   svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     color: var(--text-accent);
   }
 
   .connection-info {
     flex: 1;
+    font-size: 0.875rem;
+
+    small {
+      font-size: 0.75rem;
+    }
   }
 
   .status {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: var(--radius-full);
     background: var(--status-success);
   }
@@ -100,17 +131,18 @@ const NavItem = styled.a<{ active?: boolean }>`
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   color: ${props => props.active ? 'var(--text-primary)' : 'var(--text-secondary)'};
   background: ${props => props.active ? 'var(--bg-accent)' : 'transparent'};
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
+  font-size: 0.875rem;
   font-weight: 500;
 
   svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     opacity: ${props => props.active ? 1 : 0.7};
   }
 
@@ -158,8 +190,60 @@ const UserProfile = styled.div`
   color: var(--text-primary);
 `;
 
+const Divider = styled.div`
+  height: 1px;
+  background: var(--border-subtle);
+  margin: var(--space-2) var(--space-4);
+  opacity: 0.5;
+`;
+
+const ActionButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  font-size: 0.75rem;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-1);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--bg-surface-hover);
+    color: var(--text-primary);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &.danger {
+    color: var(--status-error);
+    
+    &:hover:not(:disabled) {
+      background: var(--status-error-hover);
+    }
+  }
+`;
+
 export function ClientLayout({ children }: ClientLayoutProps) {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTask, setCurrentTask] = useState('');
+  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleTrelloClick = async () => {
     try {
@@ -203,56 +287,199 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     }
   };
 
+  const handleCleanup = async () => {
+    setShowConfirm(true);
+  };
+
+  const handleConfirmCleanup = async () => {
+    setShowConfirm(false);
+    setIsLoading(true);
+    setProgress(0);
+    setStatus('processing');
+    
+    try {
+      // Limpando dados
+      setCurrentTask('Removendo boards do Trello...');
+      const trelloBoards = await trelloApi.get('/members/me/boards');
+      const totalBoards = trelloBoards.data.length;
+      
+      for (let i = 0; i < totalBoards; i++) {
+        await trelloApi.delete(`/boards/${trelloBoards.data[i].id}`);
+        setProgress(Math.round((i + 1) / (totalBoards + 5) * 50));
+        await new Promise(resolve => setTimeout(resolve, 300)); // Pequeno delay para animação
+      }
+
+      setCurrentTask('Removendo projetos do Asana...');
+      const user = await asanaApi.get('/users/me');
+      const workspaceId = user.data.data.workspaces[0].gid;
+      const asanaProjects = await asanaApi.get(`/workspaces/${workspaceId}/projects`);
+      const totalProjects = asanaProjects.data.data.length;
+
+      for (let i = 0; i < totalProjects; i++) {
+        await asanaApi.delete(`/projects/${asanaProjects.data.data[i].gid}`);
+        setProgress(50 + Math.round((i + 1) / (totalProjects + 5) * 50));
+        await new Promise(resolve => setTimeout(resolve, 300)); // Pequeno delay para animação
+      }
+
+      setProgress(100);
+      setCurrentTask('Todos os dados foram removidos com sucesso!');
+      setStatus('success');
+      
+      // Delay para mostrar sucesso
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      router.refresh();
+    } catch (error) {
+      console.error('Erro ao limpar dados:', error);
+      setCurrentTask('Erro ao limpar dados. Tente novamente.');
+      setStatus('error');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } finally {
+      setIsLoading(false);
+      setProgress(0);
+      setCurrentTask('');
+      setStatus('processing');
+    }
+  };
+
+  const handlePopulate = async () => {
+    setIsLoading(true);
+    setProgress(0);
+    setStatus('processing');
+    
+    try {
+      setCurrentTask('Preparando ambiente...');
+      setProgress(10);
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      setCurrentTask('Criando boards no Trello...');
+      setProgress(30);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setCurrentTask('Configurando listas e labels...');
+      setProgress(50);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await migrationScripts.populate();
+      
+      setCurrentTask('Finalizando configurações...');
+      setProgress(90);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setProgress(100);
+      setCurrentTask('Dados de exemplo criados com sucesso!');
+      setStatus('success');
+      
+      // Delay para mostrar sucesso
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      router.refresh();
+    } catch (error) {
+      console.error('Erro ao criar dados:', error);
+      setCurrentTask('Erro ao criar dados. Tente novamente.');
+      setStatus('error');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } finally {
+      setIsLoading(false);
+      setProgress(0);
+      setCurrentTask('');
+      setStatus('processing');
+    }
+  };
+
   return (
     <StyledComponentsRegistry>
       <ThemeProvider theme={theme}>
         <GlobalStyles />
         <Layout>
           <Sidebar>
-            <Logo>
-              <span>SysMiddle</span>
-            </Logo>
-            
-            <ConnectionPanel>
-              <ConnectionItem onClick={handleTrelloClick}>
-                <IconBrandTrello />
-                <div className="connection-info">
-                  <div>Trello</div>
-                  <small style={{ color: 'var(--text-secondary)' }}>Conectado</small>
-                </div>
-                <div className="status" />
-              </ConnectionItem>
-              <ConnectionItem onClick={handleAsanaClick}>
-                <IconBrandAsana />
-                <div className="connection-info">
-                  <div>Asana</div>
-                  <small style={{ color: 'var(--text-secondary)' }}>Conectado</small>
-                </div>
-                <div className="status" />
-              </ConnectionItem>
-            </ConnectionPanel>
+            <SidebarContent>
+              <TopSection>
+                <Logo>
+                  <span>SysMiddle</span>
+                </Logo>
+                
+                <ConnectionPanel>
+                  <ConnectionItem onClick={handleTrelloClick}>
+                    <IconBrandTrello />
+                    <div className="connection-info">
+                      <div>Trello</div>
+                      <small style={{ color: 'var(--text-secondary)' }}>Conectado</small>
+                    </div>
+                    <div className="status" />
+                  </ConnectionItem>
+                  <ConnectionItem onClick={handleAsanaClick}>
+                    <IconBrandAsana />
+                    <div className="connection-info">
+                      <div>Asana</div>
+                      <small style={{ color: 'var(--text-secondary)' }}>Conectado</small>
+                    </div>
+                    <div className="status" />
+                  </ConnectionItem>
+                </ConnectionPanel>
+              </TopSection>
 
-            <Nav>
-              <NavItem href="/dashboard" active>
-                <IconHome />
-                Dashboard
-              </NavItem>
-              <NavItem href="/migracao">
-                <IconArrowsExchange />
-                Migração
-              </NavItem>
-              <NavItem href="/trello">
-                <IconBrandTrello />
-                Trello
-              </NavItem>
-              <NavItem href="/asana">
-                <IconBrandAsana />
-                Asana
-              </NavItem>
-            </Nav>
+              <NavSection>
+                <Nav>
+                  <NavItem href="/dashboard">
+                    <IconHome />
+                    Dashboard
+                  </NavItem>
+                  <NavItem href="/migracao">
+                    <IconArrowsExchange />
+                    Migração
+                  </NavItem>
+                  <NavItem href="/trello">
+                    <IconBrandTrello />
+                    Trello
+                  </NavItem>
+                  <NavItem href="/asana">
+                    <IconBrandAsana />
+                    Asana
+                  </NavItem>
+                </Nav>
+              </NavSection>
+
+              <BottomSection>
+                <Divider />
+                <div style={{ padding: '0 var(--space-4)' }}>
+                  <ActionButton 
+                    onClick={handlePopulate}
+                    disabled={isLoading}
+                  >
+                    <IconDatabaseImport />
+                    Criar Dados de Exemplo
+                  </ActionButton>
+
+                  <ActionButton 
+                    onClick={handleCleanup}
+                    disabled={isLoading}
+                    className="danger"
+                  >
+                    <IconTrash />
+                    Limpar Todos os Dados
+                  </ActionButton>
+                </div>
+              </BottomSection>
+            </SidebarContent>
           </Sidebar>
 
           {children}
+
+          <ProgressModal 
+            isOpen={isLoading}
+            currentTask={currentTask}
+            progress={progress}
+            status={status}
+          />
+
+          <ConfirmModal
+            isOpen={showConfirm}
+            title="Limpar Todos os Dados"
+            message="Tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita."
+            onConfirm={handleConfirmCleanup}
+            onCancel={() => setShowConfirm(false)}
+          />
         </Layout>
       </ThemeProvider>
     </StyledComponentsRegistry>

@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest"
+    "test": "jest",
+    "migration:cleanup": "tsx src/scripts/run-migration-scripts.ts cleanup",
+    "migration:populate": "tsx src/scripts/run-migration-scripts.ts populate",
+    "migration:reset": "tsx src/scripts/run-migration-scripts.ts reset"
   },
   "dependencies": {
     "@radix-ui/react-primitive": "^1.0.0",
