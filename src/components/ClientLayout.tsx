@@ -6,7 +6,7 @@ import styled from 'styled-components';
 import { theme } from '@/styles/theme';
 import StyledComponentsRegistry from '@/lib/registry';
 import { GlobalStyles } from '@/styles/global';
-import { IconHome, IconBriefcase, IconList, IconSettings, IconBrandTrello, IconBrandAsana, IconBell, IconUser, IconArrowsExchange, IconTrash, IconRefresh, IconDatabaseImport, IconTableExport } from '@tabler/icons-react';
+import { IconHome, IconBriefcase, IconList, IconSettings, IconBrandTrello, IconBrandAsana, IconBell, IconUser, IconArrowsExchange, IconTrash, IconRefresh, IconDatabaseImport, IconTableExport, IconKey, IconLock, IconArrowsTransferUp } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { trelloApi, asanaApi } from '@/services/api';
 import { migrationScripts } from '@/scripts/migration-data';
@@ -519,6 +519,10 @@ export function ClientLayout({ children }: ClientLayoutProps) {
                   <MenuItem href="/mapeamento" icon={IconTableExport}>
                     <IconTableExport />
                     De-Para
+                  </MenuItem>
+                  <MenuItem href="/fluxo" icon={IconArrowsTransferUp}>
+                    <IconArrowsTransferUp />
+                    Fluxo de Integração
                   </MenuItem>
                   <MenuItem href="/migracao" icon={IconArrowsExchange}>
                     <IconArrowsExchange />
