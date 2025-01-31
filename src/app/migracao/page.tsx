@@ -376,6 +376,165 @@ const ProgressBar = styled.div`
   }
 `;
 
+const TransferArea = styled.div`
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  width: 180px;
+  height: 180px;
+`;
+
+const TransferCircle = styled.div<{ active?: boolean }>`
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, ${props => props.active ? '0.2' : '0.05'});
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    width: 140%;
+    height: 140%;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, ${props => props.active ? '0.1' : '0.02'});
+    animation: pulse 2s ease-in-out infinite 0.3s;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.5; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+`;
+
+const TransferButton = styled.button<{ active?: boolean }>`
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: none;
+  background: ${props => props.active ? 
+    'radial-gradient(circle at 30% 30%, #00b8d4, #0091ea)' : 
+    'radial-gradient(circle at 30% 30%, #455a64, #37474f)'
+  };
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: ${props => props.active ? 'pointer' : 'not-allowed'};
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 60%);
+    transform: rotate(0deg);
+    animation: rotate 8s linear infinite;
+  }
+
+  &:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 12px 48px rgba(0, 184, 212, 0.4);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 32px;
+    height: 32px;
+    transition: transform 0.3s ease;
+  }
+
+  &:hover:not(:disabled) svg {
+    transform: rotate(180deg);
+  }
+
+  .spin {
+    animation: spin 1.5s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  span {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+`;
+
+const ParticleEffect = styled.div<{ active?: boolean }>`
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #00b8d4;
+    opacity: ${props => props.active ? 1 : 0};
+    transition: opacity 0.3s ease;
+  }
+
+  &::before {
+    top: 20%;
+    left: 10%;
+    animation: float 3s ease-in-out infinite;
+  }
+
+  &::after {
+    bottom: 20%;
+    right: 10%;
+    animation: float 3s ease-in-out infinite 1.5s;
+  }
+
+  @keyframes float {
+    0% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-10px) scale(1.2); }
+    100% { transform: translateY(0) scale(1); }
+  }
+`;
+
 interface Project {
   id: string;
   title: string;
@@ -506,7 +665,7 @@ export default function MigracaoPage() {
         } else {
           setCurrentTask(
             `Transferindo card ${progress.current} de ${progress.total}...\n` +
-            `${selectedProject?.lists?.find(l => l.cards.find(c => c.id === progress.current))?.name || ''}`
+            `${selectedProject?.lists?.find(l => l.cards.find(c => c.id === String(progress.current)))?.name || ''}`
           );
         }
       });
@@ -542,9 +701,15 @@ export default function MigracaoPage() {
       // Delay para mostrar o sucesso
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Limpar seleções
+      // Limpar apenas as seleções e manter na mesma tela
       setSelectedTrelloBoard(undefined);
       setSelectedAsanaProject(undefined);
+      
+      // Recarregar os dados para atualizar a visualização
+      await Promise.all([
+        loadTrelloProjects(),
+        loadAsanaProjects()
+      ]);
     } catch (error) {
       console.error('Erro durante a migração:', error);
       setCurrentTask('❌ Erro durante a transferência.\nVerifique as conexões e tente novamente.');
@@ -749,25 +914,31 @@ export default function MigracaoPage() {
                 </>
               )}
             </Stats>
-            <Button 
-              variant="primary"
+          </ActionBar>
+        </SourcePanel>
+
+        <TransferArea>
+          <TransferCircle active={!!selectedTrelloBoard && !!selectedAsanaProject}>
+            <ParticleEffect active={!!selectedTrelloBoard && !!selectedAsanaProject} />
+            <TransferButton
+              active={!!selectedTrelloBoard && !!selectedAsanaProject}
               disabled={!selectedTrelloBoard || !selectedAsanaProject || migrating}
               onClick={handleMigration}
             >
               {migrating ? (
                 <>
                   <IconLoader2 className="spin" />
-                  Transferindo...
+                  <span>Transferindo</span>
                 </>
               ) : (
                 <>
                   <IconArrowsExchange />
-                  Transferir
+                  <span>Transferir</span>
                 </>
               )}
-            </Button>
-          </ActionBar>
-        </SourcePanel>
+            </TransferButton>
+          </TransferCircle>
+        </TransferArea>
 
         <TargetPanel>
           <PanelHeader>
@@ -802,23 +973,6 @@ export default function MigracaoPage() {
             <Stats>
               {selectedAsanaProject && <span>1 projeto selecionado</span>}
             </Stats>
-            <Button 
-              variant="primary"
-              disabled={!selectedTrelloBoard || !selectedAsanaProject || migrating}
-              onClick={handleMigration}
-            >
-              {migrating ? (
-                <>
-                  <IconLoader2 />
-                  Migrando...
-                </>
-              ) : (
-                <>
-                  <IconArrowsExchange />
-                  Iniciar Migração
-                </>
-              )}
-            </Button>
           </ActionBar>
         </TargetPanel>
       </Content>
