@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next dev",
+    "start": "next start",
     "lint": "next lint",
     "test": "jest",
     "migration:cleanup": "tsx src/scripts/run-migration-scripts.ts cleanup",
@@ -22,9 +22,7 @@
     "@types/styled-components": "^5.1.34",
     "asana": "^3.0.15",
     "axios": "^1.7.9",
-    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
     "lucide-react": "^0.474.0",
     "next": "14.1.0",
     "next-auth": "^4.24.5",
