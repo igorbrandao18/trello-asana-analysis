@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { IconArrowsExchange, IconBrandTrello, IconLayoutGrid, IconLoader2, IconChevronDown, IconCalendar, IconTag, IconUsers, IconLayoutList, IconCards } from '@tabler/icons-react';
+import { IconArrowsExchange, IconBrandTrello, IconLayoutGrid, IconLoader2, IconChevronDown, IconCalendar, IconTag, IconUsers, IconLayoutList, IconCards, IconBrandAsana } from '@tabler/icons-react';
 import { Header } from '@/components/Header';
 import { getTrelloProjects, getAsanaProjects, migrateProjects, migrateSingleCard } from '@/services/migration';
 import { ProgressModal } from '@/components/ProgressModal';
@@ -452,46 +452,44 @@ const TransferArea = styled.div`
   top: 50%;
   transform: translate(-50%, -50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 100;
   width: 120px;
   height: 120px;
-`;
 
-const TransferCircle = styled.div<{ active?: boolean }>`
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  &::before {
-    content: '';
+  .progress-text {
     position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: rgba(30, 42, 59, 0.1);
-    border: 1px solid rgba(30, 42, 59, ${props => props.active ? '0.3' : '0.1'});
-    animation: pulse 2s ease-in-out infinite;
+    bottom: -30px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    text-align: center;
   }
 
-  &::after {
-    content: '';
+  .progress-ring {
     position: absolute;
-    width: 120%;
-    height: 120%;
-    border-radius: 50%;
-    border: 1px solid rgba(30, 42, 59, ${props => props.active ? '0.2' : '0.05'});
-    animation: pulse 2s ease-in-out infinite 0.3s;
-  }
+    width: 100px;
+    height: 100px;
+    transform: rotate(-90deg);
 
-  @keyframes pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.1); opacity: 0.5; }
-    100% { transform: scale(1); opacity: 1; }
+    circle {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.3s ease;
+    }
+
+    .progress-ring-bg {
+      stroke: rgba(255, 255, 255, 0.1);
+    }
+
+    .progress-ring-fg {
+      stroke: #ffffff;
+      stroke-dasharray: 283;
+      stroke-dashoffset: ${props => 283 - (283 * props.progress) / 100};
+    }
   }
 `;
 
@@ -514,18 +512,12 @@ const TransferButton = styled.button<{ active?: boolean }>`
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   position: relative;
-  overflow: hidden;
+  z-index: 10;
 
-  &::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 60%);
-    transform: rotate(0deg);
-    animation: rotate 8s linear infinite;
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
   }
 
   &:hover:not(:disabled) {
@@ -537,38 +529,58 @@ const TransferButton = styled.button<{ active?: boolean }>`
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
   }
 
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
   svg {
     width: 24px;
     height: 24px;
     transition: transform 0.3s ease;
   }
 
-  &:hover:not(:disabled) svg {
-    transform: rotate(180deg);
-  }
-
-  .spin {
-    animation: spin 1.5s linear infinite;
-  }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  @keyframes rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
   span {
     font-size: 0.75rem;
     font-weight: 500;
+  }
+`;
+
+const TransferCircle = styled.div<{ active?: boolean }>`
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  .progress-ring {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    transform: rotate(-90deg);
+    pointer-events: none;
+    z-index: 5;
+  }
+  
+  &::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(30, 42, 59, 0.1);
+    border: 1px solid rgba(30, 42, 59, ${props => props.active ? '0.3' : '0.1'});
+    animation: pulse 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    width: 120%;
+    height: 120%;
+    border-radius: 50%;
+    border: 1px solid rgba(30, 42, 59, ${props => props.active ? '0.2' : '0.05'});
+    animation: pulse 2s ease-in-out infinite 0.3s;
+    pointer-events: none;
+    z-index: 1;
   }
 `;
 
@@ -917,6 +929,49 @@ const ModalContent = styled.div`
   }
 `;
 
+const CardPreview = styled.div`
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateX(4px);
+  }
+
+  .card-description {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 0.25rem;
+  }
+
+  .card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+
+    .meta-tag {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+
+      svg {
+        width: 12px;
+        height: 12px;
+        opacity: 0.7;
+      }
+    }
+  }
+`;
+
 interface Project {
   id: string;
   title: string;
@@ -1114,7 +1169,7 @@ export default function MigracaoPage() {
 
   const handleSingleCardMigration = async (cardId: string, boardId: string) => {
     if (!selectedAsanaProject) {
-      setCurrentTask('❌ Selecione um projeto do Asana para migrar o card.');
+      setCurrentTask('Erro: Selecione um projeto do Asana para migrar o card.');
       setStatus('error');
       await new Promise(resolve => setTimeout(resolve, 2000));
       setCurrentTask('');
@@ -1123,7 +1178,7 @@ export default function MigracaoPage() {
     }
 
     if (!selectedAsanaSection) {
-      setCurrentTask('❌ Selecione uma seção do Asana para migrar o card.');
+      setCurrentTask('Erro: Selecione uma seção do Asana para migrar o card.');
       setStatus('error');
       await new Promise(resolve => setTimeout(resolve, 2000));
       setCurrentTask('');
@@ -1153,10 +1208,9 @@ export default function MigracaoPage() {
       );
       
       setProgress(100);
-      setCurrentTask('Card migrado com sucesso! 🎉');
+      setCurrentTask('Card migrado com sucesso!');
       setStatus('success');
       
-      // Recarregar os dados após sucesso
       await Promise.all([
         loadTrelloProjects(),
         loadAsanaProjects()
@@ -1173,8 +1227,7 @@ export default function MigracaoPage() {
         stack: error.stack
       });
       
-      // Mensagem de erro mais específica para o usuário
-      setCurrentTask(`❌ ${error.message || 'Erro ao migrar o card'}. Verifique o console para mais detalhes.`);
+      setCurrentTask('Erro: ' + (error.message || 'Falha ao migrar o card') + '. Verifique o console para mais detalhes.');
       setStatus('error');
       await new Promise(resolve => setTimeout(resolve, 3000));
     } finally {
@@ -1277,38 +1330,104 @@ export default function MigracaoPage() {
       selected={selectedAsanaProject === project.id}
       onClick={() => {
         setSelectedAsanaProject(selectedAsanaProject === project.id ? undefined : project.id);
-        setSelectedAsanaSection(undefined); // Limpa a seção selecionada ao trocar de projeto
+        setSelectedAsanaSection(undefined);
       }}
     >
       <div className="title">
-        <span>{project.title}</span>
+        <span>
+          <IconBrandAsana />
+          {project.title}
+        </span>
+        <IconChevronDown />
       </div>
       {project.description && (
         <div className="description">{project.description}</div>
       )}
       <div className="meta">
-        <span>{project.lists?.length || 0} Seções</span>
-        <span className="separator">•</span>
-        <span>{project.members} {project.members === 1 ? 'Membro' : 'Membros'}</span>
-        <span className="separator">•</span>
-        <span>{project.status}</span>
+        <div className="meta-item">
+          <IconLayoutList />
+          {project.lists?.length || 0} Seções
+        </div>
+        <div className="meta-item">
+          <IconCards />
+          {project.cards} Tasks
+        </div>
+        <div className="meta-item">
+          <IconUsers />
+          {project.members} {project.members === 1 ? 'Membro' : 'Membros'}
+        </div>
+        <div className="meta-item">
+          <IconCalendar />
+          Atualizado {new Date().toLocaleDateString()}
+        </div>
       </div>
       {selectedAsanaProject === project.id && project.lists && (
-        <SectionsList>
-          <h4>Selecione a seção:</h4>
-          {project.lists.map(section => (
-            <SectionItem
-              key={section.id}
-              selected={selectedAsanaSection === section.id}
+        <div className="lists">
+          {project.lists.map(list => (
+            <div 
+              key={list.id} 
+              className="list-item"
               onClick={(e) => {
                 e.stopPropagation();
-                setSelectedAsanaSection(selectedAsanaSection === section.id ? undefined : section.id);
+                setSelectedAsanaSection(selectedAsanaSection === list.id ? undefined : list.id);
               }}
             >
-              {section.name}
-            </SectionItem>
+              <div className="list-header">
+                <h4>{list.name}</h4>
+                <span>{list.cards.length} tasks</span>
+              </div>
+              <div className="cards-preview">
+                {list.cards.slice(0, 3).map(card => (
+                  <div 
+                    key={card.id} 
+                    className="card-preview"
+                    style={{
+                      background: selectedAsanaSection === list.id ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                      borderLeft: selectedAsanaSection === list.id ? '2px solid var(--primary)' : 'none',
+                      paddingLeft: selectedAsanaSection === list.id ? '0.75rem' : '0.5rem'
+                    }}
+                  >
+                    {card.name}
+                    {card.description && (
+                      <div className="card-description">
+                        {card.description.length > 50 
+                          ? card.description.substring(0, 50) + '...' 
+                          : card.description}
+                      </div>
+                    )}
+                    {(card.due || card.labels?.length > 0 || card.members?.length > 0) && (
+                      <div className="card-meta">
+                        {card.due && (
+                          <span className="meta-tag">
+                            <IconCalendar />
+                            {new Date(card.due).toLocaleDateString()}
+                          </span>
+                        )}
+                        {card.labels?.map((label, idx) => (
+                          <span key={idx} className="meta-tag">
+                            <IconTag />
+                            {label}
+                          </span>
+                        ))}
+                        {card.members?.length > 0 && (
+                          <span className="meta-tag">
+                            <IconUsers />
+                            {card.members.length}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {list.cards.length > 3 && (
+                  <div className="more-cards">
+                    +{list.cards.length - 3} tasks
+                  </div>
+                )}
+              </div>
+            </div>
           ))}
-        </SectionsList>
+        </div>
       )}
     </ProjectCard>
   );
@@ -1361,6 +1480,24 @@ export default function MigracaoPage() {
         <TransferArea>
           <TransferCircle active={!!selectedTrelloBoard}>
             <ParticleEffect active={!!selectedTrelloBoard} />
+            {migrating && (
+              <svg className="progress-ring" viewBox="0 0 100 100">
+                <circle 
+                  className="progress-ring-bg"
+                  cx="50" 
+                  cy="50" 
+                  r="45"
+                />
+                <circle 
+                  className="progress-ring-fg"
+                  cx="50" 
+                  cy="50" 
+                  r="45"
+                  strokeDasharray="283"
+                  strokeDashoffset={283 - (283 * progress) / 100}
+                />
+              </svg>
+            )}
             <TransferButton
               active={!!selectedTrelloBoard}
               disabled={!selectedTrelloBoard || migrating}
@@ -1379,6 +1516,13 @@ export default function MigracaoPage() {
               )}
             </TransferButton>
           </TransferCircle>
+          {migrating && (
+            <div className="progress-text">
+              {Math.round(progress)}%
+              <br />
+              {currentTask}
+            </div>
+          )}
         </TransferArea>
 
         <TargetPanel>
