@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { IconBrandTrello, IconBrandAsana, IconArrowRight, IconCheck } from '@tabler/icons-react';
+import { IconBrandTrello, IconBrandAsana, IconArrowRight, IconCheck, IconLoader2, IconCalendar, IconTag, IconUsers } from '@tabler/icons-react';
+import { getTrelloProjects, getAsanaProjects, migrateProjects } from '@/services/migration';
 
 const PageWrapper = styled.div`
   position: fixed;
@@ -119,11 +120,59 @@ const ProjectCard = styled.div`
     color: var(--text-primary);
   }
 
+  .description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-3);
+    margin-left: calc(18px + var(--space-3));
+  }
+
   .meta {
     display: flex;
     gap: var(--space-4);
     font-size: 0.75rem;
     color: var(--text-secondary);
+    margin-left: calc(18px + var(--space-3));
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  .lists {
+    margin-top: var(--space-3);
+    margin-left: calc(18px + var(--space-3));
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    gap: var(--space-3);
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  .list {
+    flex: 0 0 200px;
+    padding: var(--space-2);
+    background: var(--bg-surface-hover);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+
+    .list-name {
+      font-weight: 500;
+      margin-bottom: var(--space-2);
+      color: var(--text-primary);
+    }
+
+    .card-count {
+      color: var(--text-secondary);
+    }
   }
 
   .checkbox {
@@ -131,6 +180,7 @@ const ProjectCard = styled.div`
     height: 18px;
     border: 2px solid var(--border-subtle);
     border-radius: var(--radius-sm);
+    flex-shrink: 0;
     
     &:checked {
       background: var(--brand-primary);
@@ -168,20 +218,106 @@ const Button = styled.button`
   }
 `;
 
+const LoadingState = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  color: var(--text-secondary);
+  gap: var(--space-4);
+
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
+const EmptyState = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  color: var(--text-secondary);
+`;
+
+interface List {
+  id: string;
+  name: string;
+  cards: Array<{
+    id: string;
+    name: string;
+    description: string;
+    due?: string;
+    labels?: string[];
+    members?: string[];
+  }>;
+}
+
+interface Project {
+  id: string;
+  title: string;
+  description?: string;
+  cards: number;
+  members: number;
+  status: string;
+  lists?: List[];
+}
+
 export default function MigracaoPage() {
   const [selectedPlatform, setSelectedPlatform] = useState<'trello' | 'asana' | null>(null);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [migrating, setMigrating] = useState(false);
 
-  const projects = [
-    { id: '1', title: 'Marketing Digital', cards: 12, members: 5, status: 'Em andamento' },
-    { id: '2', title: 'Website Redesign', cards: 8, members: 3, status: 'Planejamento' },
-    { id: '3', title: 'Design System', cards: 15, members: 4, status: 'Em andamento' },
-  ];
+  useEffect(() => {
+    async function loadProjects() {
+      if (!selectedPlatform) {
+        setProjects([]);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const data = await (selectedPlatform === 'trello' ? getTrelloProjects() : getAsanaProjects());
+        setProjects(data);
+      } catch (error) {
+        console.error('Erro ao carregar projetos:', error);
+        // Aqui você pode adicionar uma notificação de erro para o usuário
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProjects();
+  }, [selectedPlatform]);
 
   const handleItemSelect = (id: string) => {
     setSelectedItems(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
+  };
+
+  const handleMigration = async () => {
+    if (!selectedPlatform || selectedItems.length === 0) return;
+
+    setMigrating(true);
+    try {
+      await migrateProjects(selectedPlatform, selectedItems);
+      // Aqui você pode adicionar uma notificação de sucesso
+      setSelectedItems([]);
+      setSelectedPlatform(null);
+    } catch (error) {
+      console.error('Erro durante a migração:', error);
+      // Aqui você pode adicionar uma notificação de erro
+    } finally {
+      setMigrating(false);
+    }
   };
 
   return (
@@ -218,30 +354,81 @@ export default function MigracaoPage() {
 
         <MainPanel>
           <ProjectList>
-            {projects.map(project => (
-              <ProjectCard key={project.id} onClick={() => handleItemSelect(project.id)}>
-                <div className="header">
-                  <input
-                    type="checkbox"
-                    className="checkbox"
-                    checked={selectedItems.includes(project.id)}
-                    onChange={() => {}}
-                  />
-                  <span className="title">{project.title}</span>
-                </div>
-                <div className="meta">
-                  <span>{project.cards} cards</span>
-                  <span>{project.members} membros</span>
-                  <span>{project.status}</span>
-                </div>
-              </ProjectCard>
-            ))}
+            {loading ? (
+              <LoadingState>
+                <IconLoader2 className="spin" />
+                <p>Carregando projetos...</p>
+              </LoadingState>
+            ) : projects.length > 0 ? (
+              projects.map(project => (
+                <ProjectCard key={project.id} onClick={() => handleItemSelect(project.id)}>
+                  <div className="header">
+                    <input
+                      type="checkbox"
+                      className="checkbox"
+                      checked={selectedItems.includes(project.id)}
+                      onChange={() => {}}
+                    />
+                    <span className="title">{project.title}</span>
+                  </div>
+                  
+                  {project.description && (
+                    <div className="description">{project.description}</div>
+                  )}
+
+                  <div className="meta">
+                    <span className="meta-item">
+                      <IconTag size={14} />
+                      {project.cards} cards
+                    </span>
+                    <span className="meta-item">
+                      <IconUsers size={14} />
+                      {project.members} membros
+                    </span>
+                    <span className="meta-item">
+                      {project.status}
+                    </span>
+                  </div>
+
+                  {project.lists && project.lists.length > 0 && (
+                    <div className="lists">
+                      {project.lists.map(list => (
+                        <div key={list.id} className="list">
+                          <div className="list-name">{list.name}</div>
+                          <div className="card-count">{list.cards.length} cards</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ProjectCard>
+              ))
+            ) : selectedPlatform ? (
+              <EmptyState>
+                <p>Nenhum projeto encontrado</p>
+              </EmptyState>
+            ) : (
+              <EmptyState>
+                <p>Selecione uma plataforma para ver os projetos</p>
+              </EmptyState>
+            )}
           </ProjectList>
 
           <ActionBar>
-            <Button disabled={!selectedPlatform || selectedItems.length === 0}>
-              Iniciar Migração
-              <IconArrowRight size={16} />
+            <Button 
+              disabled={!selectedPlatform || selectedItems.length === 0 || migrating}
+              onClick={handleMigration}
+            >
+              {migrating ? (
+                <>
+                  <IconLoader2 className="spin" />
+                  Migrando...
+                </>
+              ) : (
+                <>
+                  Iniciar Migração
+                  <IconArrowRight size={16} />
+                </>
+              )}
             </Button>
           </ActionBar>
         </MainPanel>
