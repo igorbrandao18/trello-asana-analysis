@@ -262,4 +262,76 @@ export async function migrateProjects(
     console.error('Erro durante a migração:', error);
     throw error;
   }
+}
+
+export async function migrateSingleCard(
+  cardId: string,
+  boardId: string,
+  onProgress?: (progress: { current: number; total: number }) => void
+) {
+  try {
+    // 1. Buscar detalhes do card no Trello
+    const card = await trelloApi.get(`/cards/${cardId}`, {
+      params: {
+        fields: 'id,name,desc,due,labels,idMembers,idList'
+      }
+    });
+
+    // 2. Buscar detalhes do board para saber a lista
+    const board = await trelloApi.get(`/boards/${boardId}`, {
+      params: {
+        lists: 'open',
+        fields: 'id,name,desc'
+      }
+    });
+
+    // 3. Criar ou obter projeto no Asana
+    const user = await asanaApi.get('/users/me');
+    const workspaceId = user.data.data.workspaces[0].gid;
+
+    const asanaProject = await asanaApi.post('/projects', {
+      data: {
+        name: `${board.data.name} (Migrado do Trello)`,
+        notes: board.data.desc,
+        workspace: workspaceId,
+      },
+    });
+
+    const projectId = asanaProject.data.data.gid;
+
+    // 4. Criar seção no Asana correspondente à lista do Trello
+    const list = await trelloApi.get(`/lists/${card.data.idList}`);
+    const section = await asanaApi.post(`/projects/${projectId}/sections`, {
+      data: {
+        name: list.data.name,
+      },
+    });
+
+    // 5. Criar a tarefa no Asana
+    await asanaApi.post('/tasks', {
+      data: {
+        name: card.data.name,
+        notes: card.data.desc,
+        due_on: card.data.due,
+        projects: [projectId],
+        memberships: [{
+          project: projectId,
+          section: section.data.data.gid
+        }]
+      },
+    });
+
+    // 6. Deletar o card original do Trello
+    await trelloApi.delete(`/cards/${cardId}`);
+
+    onProgress?.({ current: 1, total: 1 });
+
+    return {
+      success: true,
+      message: 'Card migrado com sucesso!',
+    };
+  } catch (error) {
+    console.error('Erro ao migrar card:', error);
+    throw error;
+  }
 } 

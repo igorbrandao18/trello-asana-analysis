@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { IconArrowsExchange, IconBrandTrello, IconLayoutGrid, IconLoader2, IconChevronDown, IconCalendar, IconTag, IconUsers } from '@tabler/icons-react';
+import { IconArrowsExchange, IconBrandTrello, IconLayoutGrid, IconLoader2, IconChevronDown, IconCalendar, IconTag, IconUsers, IconLayoutList, IconCards } from '@tabler/icons-react';
 import { Header } from '@/components/Header';
-import { getTrelloProjects, getAsanaProjects, migrateProjects } from '@/services/migration';
+import { getTrelloProjects, getAsanaProjects, migrateProjects, migrateSingleCard } from '@/services/migration';
 import { ProgressModal } from '@/components/ProgressModal';
 
 const PageWrapper = styled.div`
@@ -91,42 +91,49 @@ const SearchBar = styled.div`
 const ProjectList = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 1rem 0;
+  padding: 1rem 1.25rem;
 `;
 
 const ProjectCard = styled.div<{ selected?: boolean }>`
-  padding: 1rem 1.5rem;
+  padding: 1.25rem;
+  background: ${props => props.selected ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)'};
+  border-radius: 8px;
+  border: 1px solid ${props => props.selected ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.08)'};
+  margin-bottom: 0.75rem;
   cursor: pointer;
-  border-left: 2px solid ${props => props.selected ? '#ffffff' : 'transparent'};
-  background: ${props => props.selected ? 'rgba(255, 255, 255, 0.08)' : 'transparent'};
   transition: all 0.2s ease;
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
   }
 
   .title {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #ffffff;
-    margin: 0 0 0.25rem 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-bottom: 0.75rem;
+
+    span {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
 
     svg {
-      width: 18px;
-      height: 18px;
-      opacity: 0.5;
-      transition: transform 0.2s ease;
-      transform: ${props => props.selected ? 'rotate(180deg)' : 'rotate(0deg)'};
+      width: 16px;
+      height: 16px;
+      opacity: 0.7;
     }
   }
 
   .description {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.7);
-    margin: 0 0 0.75rem 0;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 1rem;
     line-height: 1.4;
   }
 
@@ -134,12 +141,75 @@ const ProjectCard = styled.div<{ selected?: boolean }>`
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.5rem 1rem;
-    font-size: 0.75rem;
+    gap: 0.75rem;
+    font-size: 0.8rem;
     color: rgba(255, 255, 255, 0.5);
 
-    .separator {
-      color: rgba(255, 255, 255, 0.2);
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+
+      svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.5;
+      }
+    }
+  }
+
+  .lists {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .list-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    padding: 0.75rem;
+    
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      
+      h4 {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #ffffff;
+        margin: 0;
+      }
+      
+      span {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.4);
+      }
+    }
+    
+    .cards-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      
+      .card-preview {
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 4px;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.7);
+      }
+      
+      .more-cards {
+        text-align: center;
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.4);
+        padding: 0.25rem;
+      }
     }
   }
 `;
@@ -539,6 +609,314 @@ const ParticleEffect = styled.div<{ active?: boolean }>`
   }
 `;
 
+const CardActions = styled.div`
+  margin-top: var(--space-2);
+  display: flex;
+  justify-content: flex-end;
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background: var(--bg-surface);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+
+    &:hover:not(:disabled) {
+      background: var(--bg-surface-hover);
+      color: var(--text-primary);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+`;
+
+const ProjectsList = styled.div`
+  margin-top: var(--space-4);
+
+  .project-item {
+    margin-bottom: var(--space-3);
+    
+    h5 {
+      margin: 0 0 var(--space-2);
+      font-size: 0.9rem;
+      color: var(--text-primary);
+    }
+  }
+`;
+
+const SectionsList = styled.div`
+  margin-left: var(--space-4);
+`;
+
+const ProjectItem = styled.div<{ selected?: boolean }>`
+  padding: var(--space-3);
+  margin: var(--space-2) 0;
+  border-radius: var(--radius-lg);
+  background: ${props => props.selected ? 'var(--primary-soft)' : 'var(--bg-surface)'};
+  border: 2px solid ${props => props.selected ? 'var(--primary)' : 'transparent'};
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: ${props => props.selected 
+    ? '0 8px 16px rgba(var(--primary-rgb), 0.15)' 
+    : '0 2px 4px rgba(0, 0, 0, 0.05)'};
+
+  &:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 12px 24px rgba(var(--primary-rgb), 0.2);
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: ${props => props.selected ? 'var(--primary)' : 'transparent'};
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: var(--space-3);
+    width: 20px;
+    height: 20px;
+    border: 2px solid ${props => props.selected ? 'var(--primary)' : 'var(--border-color)'};
+    border-radius: 50%;
+    transform: translateY(-50%) scale(${props => props.selected ? '1' : '0.8'});
+    opacity: ${props => props.selected ? '1' : '0.5'};
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: ${props => props.selected ? 'var(--primary)' : 'transparent'};
+    background-image: ${props => props.selected ? "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z'/%3E%3C/svg%3E\")" : 'none'};
+    background-size: 12px;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  h5 {
+    margin: 0;
+    font-size: ${props => props.selected ? '1.1rem' : '1rem'};
+    color: ${props => props.selected ? 'var(--primary)' : 'var(--text-primary)'};
+    font-weight: ${props => props.selected ? '600' : '400'};
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    padding-right: var(--space-8);
+  }
+`;
+
+const SectionItem = styled.div<{ selected?: boolean }>`
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-1) 0;
+  margin-left: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: ${props => props.selected ? 'var(--primary-soft)' : 'var(--bg-surface)'};
+  border: 2px solid ${props => props.selected ? 'var(--primary)' : 'transparent'};
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-shadow: ${props => props.selected 
+    ? '0 4px 12px rgba(var(--primary-rgb), 0.15)' 
+    : '0 1px 3px rgba(0, 0, 0, 0.05)'};
+
+  &:hover {
+    border-color: var(--primary);
+    transform: translateX(8px);
+    box-shadow: 0 6px 16px rgba(var(--primary-rgb), 0.2);
+  }
+
+  &::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: ${props => props.selected ? 'var(--primary)' : 'var(--border-color)'};
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: scale(${props => props.selected ? '1' : '0.8'});
+    box-shadow: ${props => props.selected 
+      ? '0 0 0 4px rgba(var(--primary-rgb), 0.2)' 
+      : 'none'};
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: 50%;
+    width: 16px;
+    height: 2px;
+    background: ${props => props.selected ? 'var(--primary)' : 'var(--border-color)'};
+    transform: scaleX(${props => props.selected ? '1' : '0'});
+    transform-origin: left;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  color: ${props => props.selected ? 'var(--primary)' : 'var(--text-primary)'};
+  font-weight: ${props => props.selected ? '600' : '400'};
+  font-size: ${props => props.selected ? '0.95rem' : '0.9rem'};
+`;
+
+const Modal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+
+const ModalContent = styled.div`
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  width: 90%;
+  max-width: 600px;
+  position: relative;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+  transform: scale(0.95);
+  opacity: 0;
+  animation: modalEnter 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+
+  @keyframes modalEnter {
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  h3 {
+    margin: 0 0 var(--space-4);
+    font-size: 1.4rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+
+    &::before {
+      content: '';
+      width: 4px;
+      height: 24px;
+      background: var(--primary);
+      border-radius: var(--radius-sm);
+    }
+  }
+
+  .description {
+    margin-bottom: var(--space-4);
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    
+    strong {
+      color: var(--text-primary);
+      font-size: 1.1rem;
+      display: block;
+      margin-bottom: var(--space-2);
+    }
+  }
+
+  .select-project {
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border-color);
+
+    h4 {
+      margin: 0 0 var(--space-3);
+      font-size: 1rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+  }
+
+  .actions {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-end;
+    margin-top: var(--space-6);
+
+    button {
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-lg);
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+      &.cancel {
+        background: transparent;
+        color: var(--text-secondary);
+        border: 2px solid var(--border-color);
+
+        &:hover {
+          background: var(--bg-surface-hover);
+          color: var(--text-primary);
+          border-color: var(--text-primary);
+        }
+      }
+
+      &.confirm {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: var(--space-2) var(--space-6);
+        position: relative;
+        overflow: hidden;
+
+        &::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 100%;
+          height: 100%;
+          background: rgba(255, 255, 255, 0.1);
+          transform: translate(-50%, -50%) scale(0);
+          border-radius: 50%;
+          transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        &:hover:not(:disabled) {
+          background: var(--primary-dark);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+
+          &::before {
+            transform: translate(-50%, -50%) scale(2.5);
+          }
+        }
+
+        &:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+`;
+
 interface Project {
   id: string;
   title: string;
@@ -565,6 +943,7 @@ export default function MigracaoPage() {
   const [asanaProjects, setAsanaProjects] = useState<Project[]>([]);
   const [selectedTrelloBoard, setSelectedTrelloBoard] = useState<string>();
   const [selectedAsanaProject, setSelectedAsanaProject] = useState<string>();
+  const [selectedAsanaSection, setSelectedAsanaSection] = useState<string>();
   const [loadingTrello, setLoadingTrello] = useState(false);
   const [loadingAsana, setLoadingAsana] = useState(false);
   const [migrating, setMigrating] = useState(false);
@@ -573,6 +952,13 @@ export default function MigracaoPage() {
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [trelloSearch, setTrelloSearch] = useState('');
   const [asanaSearch, setAsanaSearch] = useState('');
+  const [migratingCards, setMigratingCards] = useState<Set<string>>(new Set());
+  const [selectedCard, setSelectedCard] = useState<{
+    id: string;
+    boardId: string;
+    name: string;
+    description: string;
+  } | null>(null);
 
   const loadTrelloProjects = async () => {
     setLoadingTrello(true);
@@ -726,6 +1112,104 @@ export default function MigracaoPage() {
     }
   };
 
+  const handleSingleCardMigration = async (cardId: string, boardId: string) => {
+    if (!selectedAsanaProject) {
+      setCurrentTask('❌ Selecione um projeto do Asana para migrar o card.');
+      setStatus('error');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setCurrentTask('');
+      setStatus('processing');
+      return;
+    }
+
+    if (!selectedAsanaSection) {
+      setCurrentTask('❌ Selecione uma seção do Asana para migrar o card.');
+      setStatus('error');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setCurrentTask('');
+      setStatus('processing');
+      return;
+    }
+
+    if (migratingCards.has(cardId)) return;
+    
+    setMigratingCards(prev => new Set(prev).add(cardId));
+    setMigrating(true);
+    setProgress(0);
+    setStatus('processing');
+    
+    try {
+      setCurrentTask('Iniciando migração do card...');
+      
+      await migrateSingleCard(
+        cardId, 
+        boardId, 
+        selectedAsanaProject,
+        selectedAsanaSection,
+        (progress) => {
+          setProgress(progress.current / progress.total * 100);
+          setCurrentTask('Migrando card para o Asana...');
+        }
+      );
+      
+      setProgress(100);
+      setCurrentTask('Card migrado com sucesso! 🎉');
+      setStatus('success');
+      
+      // Recarregar os dados após sucesso
+      await Promise.all([
+        loadTrelloProjects(),
+        loadAsanaProjects()
+      ]);
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (error: any) {
+      console.error('Erro detalhado ao migrar card:', {
+        cardId,
+        boardId,
+        projectId: selectedAsanaProject,
+        sectionId: selectedAsanaSection,
+        error: error.message,
+        stack: error.stack
+      });
+      
+      // Mensagem de erro mais específica para o usuário
+      setCurrentTask(`❌ ${error.message || 'Erro ao migrar o card'}. Verifique o console para mais detalhes.`);
+      setStatus('error');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    } finally {
+      setMigratingCards(prev => {
+        const next = new Set(prev);
+        next.delete(cardId);
+        return next;
+      });
+      setMigrating(false);
+      setProgress(0);
+      setCurrentTask('');
+      setStatus('processing');
+    }
+  };
+
+  const handleCardClick = (card: {
+    id: string;
+    name: string;
+    description: string;
+  }, boardId: string) => {
+    setSelectedCard({
+      id: card.id,
+      boardId,
+      name: card.name,
+      description: card.description
+    });
+  };
+
+  const handleConfirmMigration = async () => {
+    if (!selectedCard || !selectedAsanaProject || !selectedAsanaSection) return;
+    
+    await handleSingleCardMigration(selectedCard.id, selectedCard.boardId);
+    setSelectedCard(null);
+  };
+
   const renderTrelloCard = (project: Project) => (
     <ProjectCard 
       key={project.id} 
@@ -733,66 +1217,56 @@ export default function MigracaoPage() {
       onClick={() => setSelectedTrelloBoard(selectedTrelloBoard === project.id ? undefined : project.id)}
     >
       <div className="title">
-        <span>{project.title}</span>
+        <span>
+          <IconBrandTrello />
+          {project.title}
+        </span>
         <IconChevronDown />
       </div>
       {project.description && (
         <div className="description">{project.description}</div>
       )}
       <div className="meta">
-        <span>{project.lists?.length || 0} Listas</span>
-        <span className="separator">•</span>
-        <span>{project.cards} Cards</span>
-        <span className="separator">•</span>
-        <span>{project.members} {project.members === 1 ? 'Membro' : 'Membros'}</span>
+        <div className="meta-item">
+          <IconLayoutList />
+          {project.lists?.length || 0} Listas
+        </div>
+        <div className="meta-item">
+          <IconCards />
+          {project.cards} Cards
+        </div>
+        <div className="meta-item">
+          <IconUsers />
+          {project.members} {project.members === 1 ? 'Membro' : 'Membros'}
+        </div>
+        <div className="meta-item">
+          <IconCalendar />
+          Atualizado {new Date().toLocaleDateString()}
+        </div>
       </div>
       {selectedTrelloBoard === project.id && project.lists && (
-        <ProjectDetails>
-          <ListsContainer>
-            {project.lists.map(list => (
-              <ListColumn key={list.id}>
-                <ListHeader>
-                  <div className="list-title">
-                    <span>{list.name}</span>
+        <div className="lists">
+          {project.lists.map(list => (
+            <div key={list.id} className="list-item">
+              <div className="list-header">
+                <h4>{list.name}</h4>
+                <span>{list.cards.length} cards</span>
+              </div>
+              <div className="cards-preview">
+                {list.cards.slice(0, 3).map(card => (
+                  <div key={card.id} className="card-preview">
+                    {card.name}
                   </div>
-                  <div className="list-meta">
-                    {list.cards.length} {list.cards.length === 1 ? 'card' : 'cards'}
+                ))}
+                {list.cards.length > 3 && (
+                  <div className="more-cards">
+                    +{list.cards.length - 3} cards
                   </div>
-                </ListHeader>
-                <CardsList>
-                  {list.cards.map(card => (
-                    <Card key={card.id}>
-                      <div className="card-title">{card.name}</div>
-                      {card.description && (
-                        <div className="card-description">{card.description}</div>
-                      )}
-                      <div className="card-meta">
-                        {card.due && (
-                          <span className="meta-item">
-                            <IconCalendar />
-                            {new Date(card.due).toLocaleDateString()}
-                          </span>
-                        )}
-                        {card.labels && card.labels.length > 0 && (
-                          <span className="meta-item">
-                            <IconTag />
-                            {card.labels.length} etiquetas
-                          </span>
-                        )}
-                        {card.members && card.members.length > 0 && (
-                          <span className="meta-item">
-                            <IconUsers />
-                            {card.members.length} membros
-                          </span>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                </CardsList>
-              </ListColumn>
-            ))}
-          </ListsContainer>
-        </ProjectDetails>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </ProjectCard>
   );
@@ -800,6 +1274,11 @@ export default function MigracaoPage() {
   const renderAsanaCard = (project: Project) => (
     <ProjectCard 
       key={project.id}
+      selected={selectedAsanaProject === project.id}
+      onClick={() => {
+        setSelectedAsanaProject(selectedAsanaProject === project.id ? undefined : project.id);
+        setSelectedAsanaSection(undefined); // Limpa a seção selecionada ao trocar de projeto
+      }}
     >
       <div className="title">
         <span>{project.title}</span>
@@ -814,6 +1293,23 @@ export default function MigracaoPage() {
         <span className="separator">•</span>
         <span>{project.status}</span>
       </div>
+      {selectedAsanaProject === project.id && project.lists && (
+        <SectionsList>
+          <h4>Selecione a seção:</h4>
+          {project.lists.map(section => (
+            <SectionItem
+              key={section.id}
+              selected={selectedAsanaSection === section.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedAsanaSection(selectedAsanaSection === section.id ? undefined : section.id);
+              }}
+            >
+              {section.name}
+            </SectionItem>
+          ))}
+        </SectionsList>
+      )}
     </ProjectCard>
   );
 
@@ -928,6 +1424,74 @@ export default function MigracaoPage() {
         progress={progress}
         status={status}
       />
+
+      {selectedCard && (
+        <Modal onClick={() => setSelectedCard(null)}>
+          <ModalContent onClick={e => e.stopPropagation()}>
+            <h3>Transferir Card</h3>
+            <div className="description">
+              <strong>{selectedCard.name}</strong>
+              <p>{selectedCard.description}</p>
+            </div>
+            
+            <div className="select-project">
+              <h4>Selecione o destino no Asana:</h4>
+              <div className="projects-list">
+                {asanaProjects.map(project => (
+                  <div key={project.id}>
+                    <ProjectItem
+                      selected={selectedAsanaProject === project.id}
+                      onClick={() => {
+                        setSelectedAsanaProject(project.id);
+                        setSelectedAsanaSection(undefined);
+                      }}
+                    >
+                      <h5>{project.title}</h5>
+                    </ProjectItem>
+                    
+                    {selectedAsanaProject === project.id && project.lists && (
+                      <div className="sections-wrapper">
+                        <div className="sections-header">
+                          Selecione a seção:
+                        </div>
+                        {project.lists.map(section => (
+                          <SectionItem
+                            key={section.id}
+                            selected={selectedAsanaSection === section.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedAsanaSection(section.id);
+                            }}
+                          >
+                            {section.name}
+                          </SectionItem>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="actions">
+              <button className="cancel" onClick={() => setSelectedCard(null)}>
+                Cancelar
+              </button>
+              <button
+                className="confirm"
+                onClick={handleConfirmMigration}
+                disabled={!selectedAsanaProject || !selectedAsanaSection}
+              >
+                {!selectedAsanaProject 
+                  ? 'Selecione um projeto'
+                  : !selectedAsanaSection 
+                    ? 'Selecione uma seção'
+                    : 'Transferir'}
+              </button>
+            </div>
+          </ModalContent>
+        </Modal>
+      )}
     </PageWrapper>
   );
 } 
