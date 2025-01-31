@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { IconBrandTrello, IconBrandAsana, IconArrowRight, IconCheck, IconLoader2, IconCalendar, IconTag, IconUsers } from '@tabler/icons-react';
+import { IconArrowsExchange, IconBrandTrello, IconLayoutGrid, IconLoader2, IconChevronDown, IconCalendar, IconTag, IconUsers } from '@tabler/icons-react';
+import { Header } from '@/components/Header';
 import { getTrelloProjects, getAsanaProjects, migrateProjects } from '@/services/migration';
 
 const PageWrapper = styled.div`
@@ -11,223 +12,334 @@ const PageWrapper = styled.div`
   right: 0;
   bottom: 0;
   left: var(--sidebar-width);
-  background: var(--bg-surface);
+  background: #1e2a3b;
   display: flex;
   flex-direction: column;
-`;
-
-const Header = styled.div`
-  padding: var(--space-6);
-  border-bottom: 1px solid var(--border-subtle);
-  
-  h1 {
-    font-size: 1.75rem;
-    font-weight: 600;
-    margin-bottom: var(--space-2);
-    color: var(--text-primary);
-  }
-  
-  p {
-    color: var(--text-secondary);
-  }
+  overflow: hidden;
 `;
 
 const Content = styled.div`
   display: flex;
   flex: 1;
+  padding: 2rem;
+  gap: 2rem;
   overflow: hidden;
 `;
 
-const Sidebar = styled.div`
-  width: 280px;
-  border-right: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-  overflow-y: auto;
-`;
-
-const MainPanel = styled.div`
+const SourcePanel = styled.div`
   flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  background: var(--bg-base);
+  overflow: hidden;
 `;
 
-const PlatformOption = styled.div<{ selected?: boolean }>`
-  padding: var(--space-4);
-  cursor: pointer;
-  border-left: 2px solid ${props => props.selected ? 'var(--brand-primary)' : 'transparent'};
-  background: ${props => props.selected ? 'var(--bg-surface-hover)' : 'transparent'};
+const TargetPanel = styled(SourcePanel)``;
 
-  &:hover {
-    background: var(--bg-surface-hover);
-  }
+const PanelHeader = styled.div`
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 
-  .header {
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-2);
+    gap: 0.75rem;
 
     svg {
-      width: 20px;
-      height: 20px;
-      color: ${props => props.selected ? 'var(--brand-primary)' : 'var(--text-secondary)'};
-    }
-
-    h3 {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: ${props => props.selected ? 'var(--text-primary)' : 'var(--text-secondary)'};
+      width: 24px;
+      height: 24px;
+      opacity: 0.9;
     }
   }
+`;
 
-  p {
-    padding-left: calc(20px + var(--space-3));
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+const SearchBar = styled.div`
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+  input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    font-size: 0.875rem;
+
+    &::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    &:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+    }
   }
 `;
 
 const ProjectList = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-4);
+  padding: 1rem 0;
 `;
 
-const ProjectCard = styled.div`
-  padding: var(--space-4);
-  background: var(--bg-surface);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  margin-bottom: var(--space-3);
+const ProjectCard = styled.div<{ selected?: boolean }>`
+  padding: 1rem 1.5rem;
   cursor: pointer;
+  border-left: 2px solid ${props => props.selected ? '#ffffff' : 'transparent'};
+  background: ${props => props.selected ? 'rgba(255, 255, 255, 0.08)' : 'transparent'};
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: var(--brand-primary);
-    background: var(--bg-surface-hover);
-  }
-
-  .header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-2);
+    background: rgba(255, 255, 255, 0.05);
   }
 
   .title {
+    font-size: 0.875rem;
     font-weight: 500;
-    color: var(--text-primary);
+    color: #ffffff;
+    margin: 0 0 0.25rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    svg {
+      width: 18px;
+      height: 18px;
+      opacity: 0.5;
+      transition: transform 0.2s ease;
+      transform: ${props => props.selected ? 'rotate(180deg)' : 'rotate(0deg)'};
+    }
   }
 
   .description {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    margin-bottom: var(--space-3);
-    margin-left: calc(18px + var(--space-3));
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0 0 0.75rem 0;
+    line-height: 1.4;
   }
 
   .meta {
     display: flex;
-    gap: var(--space-4);
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
     font-size: 0.75rem;
-    color: var(--text-secondary);
-    margin-left: calc(18px + var(--space-3));
+    color: rgba(255, 255, 255, 0.5);
+
+    .separator {
+      color: rgba(255, 255, 255, 0.2);
+    }
+  }
+`;
+
+const ProjectDetails = styled.div`
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const ListsContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 1rem;
+  overflow-y: auto;
+  max-height: 500px;
+
+  &::-webkit-scrollbar {
+    width: 8px;
   }
 
-  .meta-item {
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+  }
+`;
+
+const ListColumn = styled.div`
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const ListHeader = styled.div`
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .list-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #ffffff;
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-
-    svg {
-      width: 14px;
-      height: 14px;
-    }
+    gap: 0.5rem;
   }
 
-  .lists {
-    margin-top: var(--space-3);
-    margin-left: calc(18px + var(--space-3));
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border-subtle);
-    display: flex;
-    gap: var(--space-3);
-    overflow-x: auto;
-    padding-bottom: var(--space-2);
-  }
-
-  .list {
-    flex: 0 0 200px;
-    padding: var(--space-2);
-    background: var(--bg-surface-hover);
-    border-radius: var(--radius-sm);
+  .list-meta {
     font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 0.25rem 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+  }
+`;
 
-    .list-name {
-      font-weight: 500;
-      margin-bottom: var(--space-2);
-      color: var(--text-primary);
-    }
+const CardsList = styled.div`
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+`;
 
-    .card-count {
-      color: var(--text-secondary);
-    }
+const Card = styled.div`
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 1rem;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-1px);
   }
 
-  .checkbox {
-    width: 18px;
-    height: 18px;
-    border: 2px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    flex-shrink: 0;
-    
-    &:checked {
-      background: var(--brand-primary);
-      border-color: var(--brand-primary);
+  .card-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+  }
+
+  .card-description {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.6875rem;
+    color: rgba(255, 255, 255, 0.5);
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      
+      svg {
+        width: 12px;
+        height: 12px;
+        opacity: 0.7;
+      }
     }
   }
 `;
 
 const ActionBar = styled.div`
-  padding: var(--space-4);
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-subtle);
-`;
-
-const Button = styled.button`
+  padding: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+`;
+
+const Button = styled.button<{ variant?: 'primary' | 'secondary' }>`
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-3) var(--space-4);
-  background: var(--brand-primary);
-  color: white;
-  border-radius: var(--radius-md);
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
   font-weight: 500;
   transition: all 0.2s ease;
+  cursor: pointer;
 
-  &:hover:not(:disabled) {
-    background: var(--brand-primary-dark);
-  }
+  ${props => props.variant === 'primary' ? `
+    background: #ffffff;
+    color: #1e2a3b;
+    border: none;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.9);
+    }
+  ` : `
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+  `}
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
 `;
 
-const LoadingState = styled.div`
+const Stats = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+`;
+
+const LoadingWrapper = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--space-8);
-  color: var(--text-secondary);
-  gap: var(--space-4);
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.7);
+  gap: 1rem;
+  height: 100%;
 
-  .spin {
+  svg {
     animation: spin 1s linear infinite;
   }
 
@@ -239,24 +351,14 @@ const LoadingState = styled.div`
 
 const EmptyState = styled.div`
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--space-8);
-  color: var(--text-secondary);
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.7);
+  height: 100%;
+  text-align: center;
 `;
-
-interface List {
-  id: string;
-  name: string;
-  cards: Array<{
-    id: string;
-    name: string;
-    description: string;
-    due?: string;
-    labels?: string[];
-    members?: string[];
-  }>;
-}
 
 interface Project {
   id: string;
@@ -265,173 +367,333 @@ interface Project {
   cards: number;
   members: number;
   status: string;
-  lists?: List[];
+  lists?: Array<{
+    id: string;
+    name: string;
+    cards: Array<{
+      id: string;
+      name: string;
+      description: string;
+      due?: string;
+      labels?: string[];
+      members?: string[];
+    }>;
+  }>;
 }
 
 export default function MigracaoPage() {
-  const [selectedPlatform, setSelectedPlatform] = useState<'trello' | 'asana' | null>(null);
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [trelloProjects, setTrelloProjects] = useState<Project[]>([]);
+  const [asanaProjects, setAsanaProjects] = useState<Project[]>([]);
+  const [selectedTrelloBoard, setSelectedTrelloBoard] = useState<string>();
+  const [selectedAsanaProject, setSelectedAsanaProject] = useState<string>();
+  const [loadingTrello, setLoadingTrello] = useState(false);
+  const [loadingAsana, setLoadingAsana] = useState(false);
   const [migrating, setMigrating] = useState(false);
+  const [trelloSearch, setTrelloSearch] = useState('');
+  const [asanaSearch, setAsanaSearch] = useState('');
 
   useEffect(() => {
-    async function loadProjects() {
-      if (!selectedPlatform) {
-        setProjects([]);
-        return;
-      }
-
-      setLoading(true);
+    async function loadTrelloProjects() {
+      setLoadingTrello(true);
       try {
-        const data = await (selectedPlatform === 'trello' ? getTrelloProjects() : getAsanaProjects());
-        setProjects(data);
+        const data = await getTrelloProjects();
+        setTrelloProjects(data);
       } catch (error) {
-        console.error('Erro ao carregar projetos:', error);
-        // Aqui você pode adicionar uma notificação de erro para o usuário
+        console.error('Erro ao carregar projetos do Trello:', error);
       } finally {
-        setLoading(false);
+        setLoadingTrello(false);
       }
     }
 
-    loadProjects();
-  }, [selectedPlatform]);
+    async function loadAsanaProjects() {
+      setLoadingAsana(true);
+      try {
+        const data = await getAsanaProjects();
+        setAsanaProjects(data);
+      } catch (error) {
+        console.error('Erro ao carregar projetos do Asana:', error);
+      } finally {
+        setLoadingAsana(false);
+      }
+    }
 
-  const handleItemSelect = (id: string) => {
-    setSelectedItems(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
+    loadTrelloProjects();
+    loadAsanaProjects();
+  }, []);
+
+  const filteredTrelloProjects = trelloProjects.filter(project =>
+    project.title.toLowerCase().includes(trelloSearch.toLowerCase()) ||
+    project.description?.toLowerCase().includes(trelloSearch.toLowerCase())
+  );
+
+  const filteredAsanaProjects = asanaProjects.filter(project =>
+    project.title.toLowerCase().includes(asanaSearch.toLowerCase()) ||
+    project.description?.toLowerCase().includes(asanaSearch.toLowerCase())
+  );
+
+  const selectedTrelloProject = trelloProjects.find(p => p.id === selectedTrelloBoard);
 
   const handleMigration = async () => {
-    if (!selectedPlatform || selectedItems.length === 0) return;
-
+    if (!selectedTrelloBoard || !selectedAsanaProject) return;
+    
     setMigrating(true);
     try {
-      await migrateProjects(selectedPlatform, selectedItems);
-      // Aqui você pode adicionar uma notificação de sucesso
-      setSelectedItems([]);
-      setSelectedPlatform(null);
+      await migrateProjects('trello', [selectedTrelloBoard]);
+      setSelectedTrelloBoard(undefined);
+      setSelectedAsanaProject(undefined);
     } catch (error) {
       console.error('Erro durante a migração:', error);
-      // Aqui você pode adicionar uma notificação de erro
     } finally {
       setMigrating(false);
     }
   };
 
+  const renderTrelloCard = (project: Project) => (
+    <ProjectCard 
+      key={project.id} 
+      selected={selectedTrelloBoard === project.id}
+      onClick={() => setSelectedTrelloBoard(project.id)}
+    >
+      <div className="title">
+        <span>{project.title}</span>
+        <IconChevronDown />
+      </div>
+      {project.description && (
+        <div className="description">{project.description}</div>
+      )}
+      <div className="meta">
+        <span>{project.lists?.length || 0} Listas</span>
+        <span className="separator">•</span>
+        <span>{project.cards} Cards</span>
+        <span className="separator">•</span>
+        <span>{project.members} {project.members === 1 ? 'Membro' : 'Membros'}</span>
+      </div>
+      {selectedTrelloBoard === project.id && project.lists && (
+        <ProjectDetails>
+          <ListsContainer>
+            {project.lists.map(list => (
+              <ListColumn key={list.id}>
+                <ListHeader>
+                  <div className="list-title">
+                    <span>{list.name}</span>
+                  </div>
+                  <div className="list-meta">
+                    {list.cards.length} {list.cards.length === 1 ? 'card' : 'cards'}
+                  </div>
+                </ListHeader>
+                <CardsList>
+                  {list.cards.map(card => (
+                    <Card key={card.id}>
+                      <div className="card-title">{card.name}</div>
+                      {card.description && (
+                        <div className="card-description">{card.description}</div>
+                      )}
+                      <div className="card-meta">
+                        {card.due && (
+                          <span className="meta-item">
+                            <IconCalendar />
+                            {new Date(card.due).toLocaleDateString()}
+                          </span>
+                        )}
+                        {card.labels && card.labels.length > 0 && (
+                          <span className="meta-item">
+                            <IconTag />
+                            {card.labels.length} etiquetas
+                          </span>
+                        )}
+                        {card.members && card.members.length > 0 && (
+                          <span className="meta-item">
+                            <IconUsers />
+                            {card.members.length} membros
+                          </span>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </CardsList>
+              </ListColumn>
+            ))}
+          </ListsContainer>
+        </ProjectDetails>
+      )}
+    </ProjectCard>
+  );
+
+  const renderAsanaCard = (project: Project) => (
+    <ProjectCard 
+      key={project.id} 
+      selected={selectedAsanaProject === project.id}
+      onClick={() => setSelectedAsanaProject(project.id)}
+    >
+      <div className="title">
+        <span>{project.title}</span>
+        <IconChevronDown />
+      </div>
+      {project.description && (
+        <div className="description">{project.description}</div>
+      )}
+      <div className="meta">
+        <span>{project.lists?.length || 0} Seções</span>
+        <span className="separator">•</span>
+        <span>{project.members} {project.members === 1 ? 'Membro' : 'Membros'}</span>
+        <span className="separator">•</span>
+        <span>{project.status}</span>
+      </div>
+      {selectedAsanaProject === project.id && project.lists && (
+        <ProjectDetails>
+          <ListsContainer>
+            {project.lists.map(list => (
+              <ListColumn key={list.id}>
+                <ListHeader>
+                  <div className="list-title">
+                    <span>{list.name}</span>
+                  </div>
+                  <div className="list-meta">
+                    {list.cards.length} {list.cards.length === 1 ? 'tarefa' : 'tarefas'}
+                  </div>
+                </ListHeader>
+                <CardsList>
+                  {list.cards.map(card => (
+                    <Card key={card.id}>
+                      <div className="card-title">{card.name}</div>
+                      {card.description && (
+                        <div className="card-description">
+                          {card.description.split('\n').map((line, index) => (
+                            line.startsWith('🎯') || line.startsWith('📊') || line.startsWith('📅') || 
+                            line.startsWith('🏷️') || line.startsWith('⭐') || line.startsWith('📋') ? (
+                              <div key={index} style={{ marginBottom: '0.25rem' }}>{line}</div>
+                            ) : null
+                          ))}
+                        </div>
+                      )}
+                      <div className="card-meta">
+                        {card.due && (
+                          <span className="meta-item">
+                            <IconCalendar />
+                            {new Date(card.due).toLocaleDateString()}
+                          </span>
+                        )}
+                        {card.labels && card.labels.length > 0 && (
+                          <span className="meta-item">
+                            <IconTag />
+                            {card.labels.length} etiquetas
+                          </span>
+                        )}
+                        {card.members && card.members.length > 0 && (
+                          <span className="meta-item">
+                            <IconUsers />
+                            {card.members.length} membros
+                          </span>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </CardsList>
+              </ListColumn>
+            ))}
+          </ListsContainer>
+        </ProjectDetails>
+      )}
+    </ProjectCard>
+  );
+
   return (
     <PageWrapper>
-      <Header>
-        <h1>Migração de Projetos</h1>
-        <p>Selecione a plataforma de destino e os projetos para migrar</p>
-      </Header>
-      
       <Content>
-        <Sidebar>
-          <PlatformOption 
-            selected={selectedPlatform === 'trello'}
-            onClick={() => setSelectedPlatform('trello')}
-          >
-            <div className="header">
+        <SourcePanel>
+          <PanelHeader>
+            <h2>
               <IconBrandTrello />
-              <h3>Trello</h3>
-            </div>
-            <p>Migre mantendo cards e listas</p>
-          </PlatformOption>
-
-          <PlatformOption 
-            selected={selectedPlatform === 'asana'}
-            onClick={() => setSelectedPlatform('asana')}
-          >
-            <div className="header">
-              <IconBrandAsana />
-              <h3>Asana</h3>
-            </div>
-            <p>Preserve tarefas e timelines</p>
-          </PlatformOption>
-        </Sidebar>
-
-        <MainPanel>
+              Trello
+            </h2>
+          </PanelHeader>
+          <SearchBar>
+            <input 
+              type="text" 
+              placeholder="Buscar quadros..." 
+              value={trelloSearch}
+              onChange={(e) => setTrelloSearch(e.target.value)}
+            />
+          </SearchBar>
           <ProjectList>
-            {loading ? (
-              <LoadingState>
-                <IconLoader2 className="spin" />
-                <p>Carregando projetos...</p>
-              </LoadingState>
-            ) : projects.length > 0 ? (
-              projects.map(project => (
-                <ProjectCard key={project.id} onClick={() => handleItemSelect(project.id)}>
-                  <div className="header">
-                    <input
-                      type="checkbox"
-                      className="checkbox"
-                      checked={selectedItems.includes(project.id)}
-                      onChange={() => {}}
-                    />
-                    <span className="title">{project.title}</span>
-                  </div>
-                  
-                  {project.description && (
-                    <div className="description">{project.description}</div>
-                  )}
-
-                  <div className="meta">
-                    <span className="meta-item">
-                      <IconTag size={14} />
-                      {project.cards} cards
-                    </span>
-                    <span className="meta-item">
-                      <IconUsers size={14} />
-                      {project.members} membros
-                    </span>
-                    <span className="meta-item">
-                      {project.status}
-                    </span>
-                  </div>
-
-                  {project.lists && project.lists.length > 0 && (
-                    <div className="lists">
-                      {project.lists.map(list => (
-                        <div key={list.id} className="list">
-                          <div className="list-name">{list.name}</div>
-                          <div className="card-count">{list.cards.length} cards</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </ProjectCard>
-              ))
-            ) : selectedPlatform ? (
-              <EmptyState>
-                <p>Nenhum projeto encontrado</p>
-              </EmptyState>
+            {loadingTrello ? (
+              <LoadingWrapper>
+                <IconLoader2 size={24} />
+                <span>Carregando quadros...</span>
+              </LoadingWrapper>
+            ) : filteredTrelloProjects.length > 0 ? (
+              filteredTrelloProjects.map(renderTrelloCard)
             ) : (
               <EmptyState>
-                <p>Selecione uma plataforma para ver os projetos</p>
+                {trelloSearch ? 'Nenhum quadro encontrado' : 'Nenhum quadro disponível'}
               </EmptyState>
             )}
           </ProjectList>
-
           <ActionBar>
+            <Stats>
+              {selectedTrelloProject && (
+                <>
+                  <span>1 quadro selecionado</span>
+                  <span>•</span>
+                  <span>{selectedTrelloProject.cards} cards para migrar</span>
+                </>
+              )}
+            </Stats>
+          </ActionBar>
+        </SourcePanel>
+
+        <TargetPanel>
+          <PanelHeader>
+            <h2>
+              <IconLayoutGrid />
+              Asana
+            </h2>
+          </PanelHeader>
+          <SearchBar>
+            <input 
+              type="text" 
+              placeholder="Buscar projetos..." 
+              value={asanaSearch}
+              onChange={(e) => setAsanaSearch(e.target.value)}
+            />
+          </SearchBar>
+          <ProjectList>
+            {loadingAsana ? (
+              <LoadingWrapper>
+                <IconLoader2 size={24} />
+                <span>Carregando projetos...</span>
+              </LoadingWrapper>
+            ) : filteredAsanaProjects.length > 0 ? (
+              filteredAsanaProjects.map(renderAsanaCard)
+            ) : (
+              <EmptyState>
+                {asanaSearch ? 'Nenhum projeto encontrado' : 'Nenhum projeto disponível'}
+              </EmptyState>
+            )}
+          </ProjectList>
+          <ActionBar>
+            <Stats>
+              {selectedAsanaProject && <span>1 projeto selecionado</span>}
+            </Stats>
             <Button 
-              disabled={!selectedPlatform || selectedItems.length === 0 || migrating}
+              variant="primary"
+              disabled={!selectedTrelloBoard || !selectedAsanaProject || migrating}
               onClick={handleMigration}
             >
               {migrating ? (
                 <>
-                  <IconLoader2 className="spin" />
+                  <IconLoader2 />
                   Migrando...
                 </>
               ) : (
                 <>
+                  <IconArrowsExchange />
                   Iniciar Migração
-                  <IconArrowRight size={16} />
                 </>
               )}
             </Button>
           </ActionBar>
-        </MainPanel>
+        </TargetPanel>
       </Content>
     </PageWrapper>
   );

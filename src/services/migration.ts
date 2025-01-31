@@ -90,17 +90,57 @@ export async function getAsanaProjects(): Promise<Project[]> {
     // Busca projetos do workspace
     const projects = await asanaApi.get(`/workspaces/${workspaceId}/projects`, {
       params: {
-        opt_fields: 'gid,name,members,status,num_tasks',
+        opt_fields: 'gid,name,notes,members,status,num_tasks',
       },
     });
 
-    return projects.data.data.map((project: any) => ({
-      id: project.gid,
-      title: project.name,
-      cards: project.num_tasks || 0,
-      members: project.members?.length || 0,
-      status: project.status || 'Em andamento',
-    }));
+    // Busca detalhes de cada projeto, incluindo seções e tarefas
+    const detailedProjects = await Promise.all(
+      projects.data.data.map(async (project: any) => {
+        // Buscar seções do projeto
+        const sectionsResponse = await asanaApi.get(`/projects/${project.gid}/sections`, {
+          params: {
+            opt_fields: 'gid,name',
+          },
+        });
+
+        // Para cada seção, buscar suas tarefas
+        const sections = await Promise.all(
+          sectionsResponse.data.data.map(async (section: any) => {
+            const tasksResponse = await asanaApi.get(`/sections/${section.gid}/tasks`, {
+              params: {
+                opt_fields: 'gid,name,notes,due_on,tags,assignee',
+              },
+            });
+
+            return {
+              id: section.gid,
+              name: section.name,
+              cards: tasksResponse.data.data.map((task: any) => ({
+                id: task.gid,
+                name: task.name,
+                description: task.notes || '',
+                due: task.due_on,
+                labels: task.tags?.map((tag: any) => tag.name) || [],
+                members: task.assignee ? [task.assignee.gid] : [],
+              })),
+            };
+          })
+        );
+
+        return {
+          id: project.gid,
+          title: project.name,
+          description: project.notes,
+          cards: project.num_tasks || 0,
+          members: project.members?.length || 0,
+          status: project.status || 'Em andamento',
+          lists: sections,
+        };
+      })
+    );
+
+    return detailedProjects;
   } catch (error) {
     console.error('Erro ao buscar projetos do Asana:', error);
     throw error;
