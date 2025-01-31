@@ -1,11 +1,7 @@
 {
-  "/_not-found": "app/_not-found.js",
-  "/endpoints/asana/page": "app/endpoints/asana/page.js",
-  "/fluxo/page": "app/fluxo/page.js",
-  "/asana/page": "app/asana/page.js",
-  "/page": "app/page.js",
-  "/trello/page": "app/trello/page.js",
   "/migracao/page": "app/migracao/page.js",
+  "/endpoints/asana/page": "app/endpoints/asana/page.js",
+  "/endpoints/trello/page": "app/endpoints/trello/page.js",
   "/mapeamento/page": "app/mapeamento/page.js",
-  "/endpoints/trello/page": "app/endpoints/trello/page.js"
+  "/fluxo/page": "app/fluxo/page.js"
 }
