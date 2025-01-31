@@ -1057,63 +1057,118 @@ export default function MigracaoPage() {
   const selectedTrelloProject = trelloProjects.find(p => p.id === selectedTrelloBoard);
 
   const handleMigration = async () => {
-    if (!selectedTrelloBoard) return;
+    if (!selectedTrelloBoard && !selectedAsanaProject) return;
     
     setMigrating(true);
     setProgress(0);
     setStatus('processing');
     
     try {
-      const selectedProject = trelloProjects.find(p => p.id === selectedTrelloBoard);
-      if (selectedProject) {
-        // Fase de Inicialização
-        setCurrentTask('Iniciando processo de transferência...');
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setProgress(5);
+      if (selectedTrelloBoard) {
+        // Migração do Trello para o Asana
+        const selectedProject = trelloProjects.find(p => p.id === selectedTrelloBoard);
+        if (selectedProject) {
+          // Fase de Inicialização
+          setCurrentTask('Iniciando processo de transferência do Trello para o Asana...');
+          await new Promise(resolve => setTimeout(resolve, 800));
+          setProgress(5);
 
-        setCurrentTask('Verificando conexão com as APIs...');
-        await new Promise(resolve => setTimeout(resolve, 600));
-        setProgress(10);
+          setCurrentTask('Verificando conexão com as APIs...');
+          await new Promise(resolve => setTimeout(resolve, 600));
+          setProgress(10);
 
-        setCurrentTask('Analisando estrutura do board...');
-        await new Promise(resolve => setTimeout(resolve, 700));
-        setProgress(15);
+          setCurrentTask('Analisando estrutura do board...');
+          await new Promise(resolve => setTimeout(resolve, 700));
+          setProgress(15);
 
-        // Fase de Preparação
-        setCurrentTask(`Preparando transferência de ${selectedProject.lists?.length || 0} listas e ${selectedProject.cards} cards...`);
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setProgress(20);
+          // Fase de Preparação
+          setCurrentTask(`Preparando transferência de ${selectedProject.lists?.length || 0} listas e ${selectedProject.cards} cards...`);
+          await new Promise(resolve => setTimeout(resolve, 800));
+          setProgress(20);
 
-        // Fase de Criação da Estrutura
-        setCurrentTask('Criando estrutura no Asana...');
-        await new Promise(resolve => setTimeout(resolve, 600));
-        setProgress(25);
+          // Fase de Criação da Estrutura
+          setCurrentTask('Criando estrutura no Asana...');
+          await new Promise(resolve => setTimeout(resolve, 600));
+          setProgress(25);
 
-        setCurrentTask('Configurando seções e propriedades...');
-        await new Promise(resolve => setTimeout(resolve, 700));
-        setProgress(30);
+          setCurrentTask('Configurando seções e propriedades...');
+          await new Promise(resolve => setTimeout(resolve, 700));
+          setProgress(30);
 
-        // Fase de Transferência
-        setCurrentTask('Iniciando transferência de conteúdo...');
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setProgress(35);
-      }
+          // Fase de Transferência
+          setCurrentTask('Iniciando transferência de conteúdo...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          setProgress(35);
 
-      // Transferência dos Cards
-      await migrateProjects('trello', [selectedTrelloBoard], (progress) => {
-        const baseProgress = 35;
-        const transferProgress = Math.round((progress.current / progress.total) * 40);
-        setProgress(baseProgress + transferProgress);
+          // Transferência dos Cards
+          await migrateProjects('trello', [selectedTrelloBoard], (progress) => {
+            const baseProgress = 35;
+            const transferProgress = Math.round((progress.current / progress.total) * 40);
+            setProgress(baseProgress + transferProgress);
 
-        if (progress.current === progress.total) {
-          setCurrentTask('Todos os cards foram transferidos com sucesso!');
-        } else {
-          setCurrentTask(
-            `Transferindo card ${progress.current} de ${progress.total}...\n` +
-            `${selectedProject?.lists?.find(l => l.cards.find(c => c.id === String(progress.current)))?.name || ''}`
-          );
+            if (progress.current === progress.total) {
+              setCurrentTask('Todos os cards foram transferidos com sucesso!');
+            } else {
+              setCurrentTask(
+                `Transferindo card ${progress.current} de ${progress.total}...\n` +
+                `${selectedProject?.lists?.find(l => l.cards.find(c => c.id === String(progress.current)))?.name || ''}`
+              );
+            }
+          });
         }
-      });
+      } else if (selectedAsanaProject) {
+        // Migração do Asana para o Trello
+        const selectedProject = asanaProjects.find(p => p.id === selectedAsanaProject);
+        if (selectedProject) {
+          // Fase de Inicialização
+          setCurrentTask('Iniciando processo de transferência do Asana para o Trello...');
+          await new Promise(resolve => setTimeout(resolve, 800));
+          setProgress(5);
+
+          setCurrentTask('Verificando conexão com as APIs...');
+          await new Promise(resolve => setTimeout(resolve, 600));
+          setProgress(10);
+
+          setCurrentTask('Analisando estrutura do projeto...');
+          await new Promise(resolve => setTimeout(resolve, 700));
+          setProgress(15);
+
+          // Fase de Preparação
+          setCurrentTask(`Preparando transferência de ${selectedProject.lists?.length || 0} seções e ${selectedProject.cards} tasks...`);
+          await new Promise(resolve => setTimeout(resolve, 800));
+          setProgress(20);
+
+          // Fase de Criação da Estrutura
+          setCurrentTask('Criando estrutura no Trello...');
+          await new Promise(resolve => setTimeout(resolve, 600));
+          setProgress(25);
+
+          setCurrentTask('Configurando listas e propriedades...');
+          await new Promise(resolve => setTimeout(resolve, 700));
+          setProgress(30);
+
+          // Fase de Transferência
+          setCurrentTask('Iniciando transferência de conteúdo...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          setProgress(35);
+
+          // Transferência das Tasks
+          await migrateProjects('asana', [selectedAsanaProject], (progress) => {
+            const baseProgress = 35;
+            const transferProgress = Math.round((progress.current / progress.total) * 40);
+            setProgress(baseProgress + transferProgress);
+
+            if (progress.current === progress.total) {
+              setCurrentTask('Todas as tasks foram transferidas com sucesso!');
+            } else {
+              setCurrentTask(
+                `Transferindo task ${progress.current} de ${progress.total}...\n` +
+                `${selectedProject?.lists?.find(l => l.cards.find(c => c.id === String(progress.current)))?.name || ''}`
+              );
+            }
+          });
+        }
+      }
 
       // Fase de Finalização
       setCurrentTask('Verificando integridade dos dados...');
@@ -1146,8 +1201,9 @@ export default function MigracaoPage() {
       // Delay para mostrar o sucesso
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Limpar apenas a seleção do Trello
+      // Limpar seleções
       setSelectedTrelloBoard(undefined);
+      setSelectedAsanaProject(undefined);
       
       // Recarregar os dados
       await Promise.all([
@@ -1282,11 +1338,22 @@ export default function MigracaoPage() {
       <div className="meta">
         <div className="meta-item">
           <IconLayoutList />
-          {project.lists?.length || 0} Listas
+          {project.lists?.filter(list => 
+            list.name !== 'Seção sem título' && 
+            list.name.toLowerCase() !== 'sem título' && 
+            list.name.toLowerCase() !== 'untitled'
+          ).length || 0} Listas
         </div>
         <div className="meta-item">
           <IconCards />
-          {project.cards} Cards
+          {(project.lists || []).reduce((total, list) => 
+            list.name !== 'Seção sem título' && 
+            list.name.toLowerCase() !== 'sem título' && 
+            list.name.toLowerCase() !== 'untitled' 
+              ? total + list.cards.length 
+              : total, 
+            0
+          )} Cards
         </div>
         <div className="meta-item">
           <IconUsers />
@@ -1299,7 +1366,9 @@ export default function MigracaoPage() {
       </div>
       {selectedTrelloBoard === project.id && project.lists && (
         <div className="lists">
-          {project.lists.map(list => (
+          {project.lists
+            .filter(list => list.name !== 'Seção sem título' && list.name.toLowerCase() !== 'sem título' && list.name.toLowerCase() !== 'untitled')
+            .map(list => (
             <div key={list.id} className="list-item">
               <div className="list-header">
                 <h4>{list.name}</h4>
@@ -1346,11 +1415,22 @@ export default function MigracaoPage() {
       <div className="meta">
         <div className="meta-item">
           <IconLayoutList />
-          {project.lists?.length || 0} Seções
+          {project.lists?.filter(list => 
+            list.name !== 'Seção sem título' && 
+            list.name.toLowerCase() !== 'sem título' && 
+            list.name.toLowerCase() !== 'untitled'
+          ).length || 0} Seções
         </div>
         <div className="meta-item">
           <IconCards />
-          {project.cards} Tasks
+          {(project.lists || []).reduce((total, list) => 
+            list.name !== 'Seção sem título' && 
+            list.name.toLowerCase() !== 'sem título' && 
+            list.name.toLowerCase() !== 'untitled' 
+              ? total + list.cards.length 
+              : total, 
+            0
+          )} Tasks
         </div>
         <div className="meta-item">
           <IconUsers />
@@ -1363,7 +1443,9 @@ export default function MigracaoPage() {
       </div>
       {selectedAsanaProject === project.id && project.lists && (
         <div className="lists">
-          {project.lists.map(list => (
+          {project.lists
+            .filter(list => list.name !== 'Seção sem título' && list.name.toLowerCase() !== 'sem título' && list.name.toLowerCase() !== 'untitled')
+            .map(list => (
             <div 
               key={list.id} 
               className="list-item"
@@ -1499,8 +1581,8 @@ export default function MigracaoPage() {
               </svg>
             )}
             <TransferButton
-              active={!!selectedTrelloBoard}
-              disabled={!selectedTrelloBoard || migrating}
+              active={!!selectedTrelloBoard || !!selectedAsanaProject}
+              disabled={(!selectedTrelloBoard && !selectedAsanaProject) || migrating}
               onClick={handleMigration}
             >
               {migrating ? (

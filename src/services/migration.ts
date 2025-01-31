@@ -267,8 +267,91 @@ export async function migrateProjects(
           });
         }
       }
-    } else {
-      throw new Error('Migração do Asana para o Trello ainda não implementada');
+    } else if (sourceType === 'asana') {
+      // Para cada projeto do Asana selecionado
+      for (const projectId of projectIds) {
+        // 1. Buscar detalhes do projeto do Asana
+        const project = await asanaApi.get(`/projects/${projectId}`, {
+          params: {
+            opt_fields: 'name,notes'
+          }
+        });
+
+        // 2. Criar board correspondente no Trello
+        const trelloBoard = await trelloApi.post('/boards', {
+          name: project.data.data.name,
+          desc: project.data.data.notes || '',
+          defaultLists: false
+        });
+
+        // 3. Buscar seções do projeto Asana
+        const sections = await asanaApi.get(`/projects/${projectId}/sections`, {
+          params: {
+            opt_fields: 'name'
+          }
+        });
+
+        // 4. Criar listas no Trello para cada seção
+        const listMap = new Map();
+        for (const section of sections.data.data) {
+          const list = await trelloApi.post('/lists', {
+            name: section.name,
+            idBoard: trelloBoard.data.id
+          });
+          listMap.set(section.gid, list.data.id);
+        }
+
+        // 5. Buscar todas as tasks do projeto
+        const tasks = await asanaApi.get(`/projects/${projectId}/tasks`, {
+          params: {
+            opt_fields: 'name,notes,due_on,memberships.section'
+          }
+        });
+
+        let tasksTransferred = 0;
+        const totalTasks = tasks.data.data.length;
+
+        // 6. Migrar cada task como card
+        for (const task of tasks.data.data) {
+          try {
+            // Obter detalhes completos da task
+            const taskDetails = await asanaApi.get(`/tasks/${task.gid}`, {
+              params: {
+                opt_fields: 'name,notes,due_on,memberships.section,tags,assignee'
+              }
+            });
+
+            const taskData = taskDetails.data.data;
+            const sectionId = taskData.memberships?.[0]?.section?.gid;
+            const listId = listMap.get(sectionId);
+
+            // Criar card no Trello
+            await trelloApi.post('/cards', {
+              name: taskData.name,
+              desc: taskData.notes || '',
+              due: taskData.due_on,
+              idList: listId,
+              idBoard: trelloBoard.data.id
+            });
+
+            // Deletar a task do Asana após migração
+            await asanaApi.delete(`/tasks/${task.gid}`);
+
+            tasksTransferred++;
+            onProgress?.({ current: tasksTransferred, total: totalTasks });
+          } catch (error) {
+            console.error(`Erro ao migrar task ${task.gid}:`, error);
+            // Continua com a próxima task mesmo se houver erro
+          }
+        }
+
+        // 7. Deletar o projeto do Asana após migração completa
+        try {
+          await asanaApi.delete(`/projects/${projectId}`);
+        } catch (error) {
+          console.error('Erro ao deletar projeto do Asana:', error);
+        }
+      }
     }
 
     return {
@@ -325,6 +408,49 @@ export async function migrateSingleCard(
     };
   } catch (error) {
     console.error('Erro ao migrar card:', error);
+    throw error;
+  }
+}
+
+export async function migrateSingleTaskFromAsana(
+  taskId: string,
+  projectId: string,
+  trelloBoardId: string,
+  trelloListId: string,
+  onProgress?: (progress: { current: number; total: number }) => void
+) {
+  try {
+    // 1. Buscar detalhes da task no Asana
+    const taskDetails = await asanaApi.get(`/tasks/${taskId}`, {
+      params: {
+        opt_fields: 'name,notes,due_on,tags,assignee'
+      }
+    });
+
+    onProgress?.({ current: 1, total: 3 });
+
+    // 2. Criar card no Trello
+    await trelloApi.post('/cards', {
+      name: taskDetails.data.data.name,
+      desc: taskDetails.data.data.notes || '',
+      due: taskDetails.data.data.due_on,
+      idList: trelloListId,
+      idBoard: trelloBoardId
+    });
+
+    onProgress?.({ current: 2, total: 3 });
+
+    // 3. Deletar a task original do Asana
+    await asanaApi.delete(`/tasks/${taskId}`);
+
+    onProgress?.({ current: 3, total: 3 });
+
+    return {
+      success: true,
+      message: 'Task migrada com sucesso!',
+    };
+  } catch (error) {
+    console.error('Erro ao migrar task:', error);
     throw error;
   }
 } 
