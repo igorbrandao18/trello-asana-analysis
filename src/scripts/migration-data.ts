@@ -208,7 +208,6 @@ async function populateWorkData() {
 
 export const migrationScripts = {
   cleanup: cleanupData,
-  populate: populateWorkData,
   async populate() {
     try {
       // Criando board principal no Trello
